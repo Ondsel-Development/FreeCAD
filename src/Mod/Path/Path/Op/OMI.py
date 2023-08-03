@@ -24,11 +24,12 @@ if False:
 else:
     Path.Log.setLevel(Path.Log.Level.INFO, Path.Log.thisModule())
 
+
 class ObjectOMI(PathOp.ObjectOp):
     """
-    Proxy object for Probing operation. 
-    Modified from Probe.py to include probing in non trivial directions. 
-    The idea for now is to be agnostic of the paths used as basis, 
+    Proxy object for Probing operation.
+    Modified from Probe.py to include probing in non trivial directions.
+    The idea for now is to be agnostic of the paths used as basis,
     since idealy we generate a new optimal path for an arbitraty set of probingPoints.
     """
 
@@ -39,12 +40,12 @@ class ObjectOMI(PathOp.ObjectOp):
         return PathOp.FeatureDepths | PathOp.FeatureHeights | PathOp.FeatureTool
 
     def initOperation(self, obj):
-        #obj.addProperty(
+        # obj.addProperty(
         #    "App::PropertyLink",
         #    "Base",
         #    "Path",
         #    QT_TRANSLATE_NOOP("App::Property", "The base geometry to use as reference"),
-        #)
+        # )
         obj.addProperty(
             "App::PropertyVectorList",
             "Starts",
@@ -146,7 +147,7 @@ class ObjectOMI(PathOp.ObjectOp):
 
         doLengthsMatch = obj.PointCount == len(obj.Starts) == len(obj.Ends)
         if not doLengthsMatch:
-            Path.Log.debug('Lists Lenghts and probing point count do not match.')
+            Path.Log.debug("Lists Lenghts and probing point count do not match.")
             return
 
         self.commandlist.append(Path.Command("(Begin Probing)"))
@@ -172,12 +173,12 @@ class ObjectOMI(PathOp.ObjectOp):
             v0, vf = probing.createProbingPoint()
             obj.Starts.append(v0)
             obj.Ends.append(vf)
-        #obj.Disabled.append([i + obj.PointCount for i in newDisabled])
-        obj.PointCount = len(obj.Starts)    
-        #obj.Disabled = []
-     
-    def setup(self, obj, base, generate = False):
-        Path.Log.debug('setup')
+        # obj.Disabled.append([i + obj.PointCount for i in newDisabled])
+        obj.PointCount = len(obj.Starts)
+        # obj.Disabled = []
+
+    def setup(self, obj, base, generate=False):
+        Path.Log.debug("setup")
         job = PathUtils.findParentJob(base)
         self.obj = obj
         self.job = job
@@ -191,24 +192,25 @@ class ObjectOMI(PathOp.ObjectOp):
                 translate(
                     "Path_OMI",
                     "Cannot generate probing points for this path - please select a Profile path",
-                    )
-                + "\n"
                 )
+                + "\n"
+            )
             return None
-        
+
         self.pathData = pathData
         if generate:
             self.generateProbingPoints(obj)
 
         return self.pathData
-    
+
+
 class PathData:
     def __init__(self, obj):
         Path.Log.track(obj.Name)
         job = PathUtils.findParentJob(obj)
         self.obj = obj
         self.models = job.Model.Group
-        
+
         faces = []
         for model in self.models:
             faces += model.Shape.Faces
@@ -226,13 +228,13 @@ class PathData:
         self.toolShape = tool.Shape
         self.toolEdges = []
         self.cuttingEdgeHeight = tool.CuttingEdgeHeight
-        self.toolEdgeNormal = FreeCAD.Vector(0,1,0)
+        self.toolEdgeNormal = FreeCAD.Vector(0, 1, 0)
         self.toolWire = tool.Shape.slice(self.toolEdgeNormal, 0)[0]
         self.probeRadius = None
         self.offsetWire = None
         self.activePath = None
         # How do we remove the tool shank?
-        #for w in tool.Shape.slice(self.toolEdgeNormal, 0):
+        # for w in tool.Shape.slice(self.toolEdgeNormal, 0):
         #   for edge in w.Edges:
         #       if all([v.Z <= CuttingEdgeHeight for v in edge.Vertexes]):
         #           self.toolEdges.append(edge)
@@ -240,13 +242,13 @@ class PathData:
     def setOffsetWire(self, probeRadius):
         self.probeRadius = probeRadius
         self.offsetWire = self.toolWire.makeOffset2D(-probeRadius)
-    
+
     def generateProbingPoints(self):
         # Missing concavity check and correction
         Path.Log.track()
         probingPoints = []
-        origin = FreeCAD.Vector(0,0,0)
-        z_dir  = FreeCAD.Vector(0,0,1)
+        origin = FreeCAD.Vector(0, 0, 0)
+        z_dir = FreeCAD.Vector(0, 0, 1)
 
         for i, edge in enumerate(self.edges):
             Path.Log.debug(f"{i}")
@@ -255,23 +257,25 @@ class PathData:
             pt = edge.Curve.value(param)
             tangent = edge.tangentAt(param)
 
-            if tangent.cross(z_dir) == origin: # Tangent vector of path in z direction, not good
-                # We find the closest face of the original shape and 
+            if (
+                tangent.cross(z_dir) == origin
+            ):  # Tangent vector of path in z direction, not good
+                # We find the closest face of the original shape and
                 # project our point to get a direction
-                '''
+                """
                 closestFace = None
                 lowerDistance = None
                 for face in self.faces:
                     #vertexes = edge.common(solid).Vertexes
                     #if vertexes:
                     #    pt = sorted(vertexes, key=lambda v: (v.Point - refPt).Length)[0].Point
-                    
+
                     #d = face.Surface.projectPoint(point, "LowerDistance") #is the use of Surface correct here?
                     if closestFace is None or d < lowerDistance:
                         closestFace = face
                         lowerDistance = d
                 tangent = z_dir.cross(closestFace.Surface.projectPoint(pt))
-                '''
+                """
                 toolAtPoint = self.toolShape.translated(pt)
                 dist_min = None
                 tangent = None
@@ -286,11 +290,11 @@ class PathData:
                                 continue
 
             tangent_XY = tangent.projectToPlane(origin, z_dir)
-            phi = tangent_XY.getAngle(self.toolEdgeNormal) # relative angle on XY plane
+            phi = tangent_XY.getAngle(self.toolEdgeNormal)  # relative angle on XY plane
             toolWire = self.toolWire.rotate(origin, z_dir, phi).translate(pt)
             offsetWire = self.offsetWire.rotate(origin, z_dir, phi).translate(pt)
             innerRegion = Part.Face(offsetWire)
-            
+
             activePath = []
             for edge in offsetWire.Edges:
                 distances = []
@@ -303,15 +307,18 @@ class PathData:
                             if all([v.Z <= self.cuttingEdgeHeight for v in edge.Vertexes]):
                                 activePath.append(edge)
                     """
-                    d, _ , _ = edge.distToShape(model.Shape)
+                    d, _, _ = edge.distToShape(model.Shape)
                     distances.append(d)
                 activePath.append(min(distances))
-            
+
             distMin = min(activePath)
-            #activePath = [d <= distMin for d in activePath]
-            activePath = [edge for edge, d in zip(offsetWire.Edges, activePath) 
-                          if Path.Geom.isRoughly(d, distMin)]
-            '''
+            # activePath = [d <= distMin for d in activePath]
+            activePath = [
+                edge
+                for edge, d in zip(offsetWire.Edges, activePath)
+                if Path.Geom.isRoughly(d, distMin)
+            ]
+            """
             distToShape = [e.distToShape(obj.Base.Base.Shape)[0] for e in toolWire.Edges]
             dMin = min(distToShape)
             # Only keep the closest edges to the object.
@@ -319,18 +326,18 @@ class PathData:
             for (d, e) in zip(distToShape, displacedToolEdges):
                 if Path.Geom.isRoughly(d, dMin):
                     toolEdges.append(e)
-            '''
+            """
 
             probingPoints.append(
-                    ProbingPoint(pt, tangent_XY, self.probeRadius, toolWire, activePath)
-                    )
+                ProbingPoint(pt, tangent_XY, self.probeRadius, toolWire, activePath)
+            )
 
         return probingPoints
 
 
 class ProbingPoint:
-    def __init__(self, pt, normal, probeRadius, toolWire, activePath, enabled = True):
-        Path.Log.track(f'{pt.x, pt.y, pt.z, probeRadius, enabled}')
+    def __init__(self, pt, normal, probeRadius, toolWire, activePath, enabled=True):
+        Path.Log.track(f"{pt.x, pt.y, pt.z, probeRadius, enabled}")
         self.pt = pt
         self.surfaceNormal = normal
         self.probeRadius = probeRadius
@@ -342,7 +349,7 @@ class ProbingPoint:
             self.parameterRange.append(edge.FirstParameter)
             self.parameterRange.append(edge.LastParameter)
         self.enabled = enabled
-        
+
         self.v0 = None
         self.vf = None
 
@@ -363,8 +370,8 @@ class ProbingPoint:
         return False
 
     def normalOnPath(self, pt):
-        #Doesnt work
-        totalTangent = FreeCAD.Vector(0,0,0)
+        # Doesnt work
+        totalTangent = FreeCAD.Vector(0, 0, 0)
         for edge in self.activePath:
             param = edge.Curve.parameter(pt)
             if ProbingPoint.isPointOnEdge(pt, edge):
@@ -381,46 +388,54 @@ class ProbingPoint:
                 return True
         return False
 
-    def createProbingPoint(self, pt = None):
+    def createProbingPoint(self, pt=None):
         if pt is None:
             pt = self.pt
         if self.isPointOnPath(pt):
             normal = self.normalOnPath(pt)
-            self.v0 = pt - normal * self.probingDistance            
+            self.v0 = pt - normal * self.probingDistance
             self.vf = pt
-        return self.v0, self.vf    
-            
-
-#def Create(name, obj=None, parentJob=None):
-#    """Create(name) ... Creates and returns a Probing operation."""
-#    if obj is None:
-#        obj = FreeCAD.ActiveDocument.addObject("Path::FeaturePython", name)
-#    proxy = ObjectProbing(obj, name, parentJob)
-#    return obj
+        return self.v0, self.vf
 
 
-def Create(baseObject, name="OMI"):
-    """
-    Create(basePath, name='OMI') ... create OMI object for the given base path.
-    """
-    if (not baseObject.isDerivedFrom("Path::Feature")
-        and not baseObject.isDerivedFrom("Path::FeatureCompoundPython")):
-        Path.Log.error(
-            translate("Path_OMI", "The selected object is not a path") + "\n"
-        )
-        return None
+def Create(name, obj=None, parentJob=None):
+   """Create(name) ... Creates and returns a Probing operation."""
+   if obj is None:
+       obj = FreeCAD.ActiveDocument.addObject("Path::FeaturePython", name)
+   proxy = ObjectOMI(obj, name, parentJob)
+   return obj
 
-    obj = FreeCAD.ActiveDocument.addObject("Path::FeaturePython", name)
-    #print(baseObject.Base)
-    job = PathUtils.findParentJob(baseObject)
-    dbo = ObjectOMI(obj, name, parentJob = job)# parameter?
-    obj.Proxy = dbo
-    dbo.ProbeRadius = 2. #To be replaced with proper ToolController
-    job.Proxy.addOperation(obj, baseObject)
-    
-    dbo.setup(obj, baseObject, True)
-    return obj
 
-for obj in Gui.Selection.getSelection():
-    omi = Create(obj)
-    #omi.Proxy.execute(omi)
+# def Create(baseObject, name="OMI"):
+#     """
+#     Create(basePath, name='OMI') ... create OMI object for the given base path.
+#     """
+#     if not baseObject.isDerivedFrom("Path::Feature") and not baseObject.isDerivedFrom(
+#         "Path::FeatureCompoundPython"
+#     ):
+#         Path.Log.error(
+#             translate("Path_OMI", "The selected object is not a path") + "\n"
+#         )
+#         return None
+
+#     obj = FreeCAD.ActiveDocument.addObject("Path::FeaturePython", name)
+#     # print(baseObject.Base)
+#     job = PathUtils.findParentJob(baseObject)
+#     dbo = ObjectOMI(obj, name, parentJob=job)  # parameter?
+#     obj.Proxy = dbo
+#     dbo.ProbeRadius = 2.0  # To be replaced with proper ToolController
+#     job.Proxy.addOperation(obj, baseObject)
+
+#     dbo.setup(obj, baseObject, True)
+#     return obj
+
+
+def SetupProperties():
+    # setup = ["Xoffset", "Yoffset", "PointCountX", "PointCountY", "OutputFileName"]
+    setup = []
+    return setup
+
+
+# for obj in Gui.Selection.getSelection():
+#    omi = Create(obj)
+#    #omi.Proxy.execute(omi)

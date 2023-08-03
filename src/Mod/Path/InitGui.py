@@ -105,6 +105,7 @@ class PathWorkbench(Workbench):
             "Path_Stop",
             "Path_Custom",
             "Path_Probe",
+            "Path_OMI",
         ]
         twodopcmdlist = [
             "Path_Profile",
