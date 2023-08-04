@@ -65,6 +65,7 @@ def Startup():
         from Path.Op.Gui import Helix
         from Path.Op.Gui import Hop
         from Path.Op.Gui import MillFace
+        from Path.Op.Gui import OMI
         from Path.Op.Gui import Pocket
         from Path.Op.Gui import PocketShape
         from Path.Op.Gui import Probe

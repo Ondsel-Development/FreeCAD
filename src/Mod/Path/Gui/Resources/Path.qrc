@@ -40,6 +40,7 @@
         <file>icons/Path_Machine.svg</file>
         <file>icons/Path_MachineLathe.svg</file>
         <file>icons/Path_MachineMill.svg</file>
+        <file>icons/Path_OMI.svg</file>
         <file>icons/Path_OpActive.svg</file>
         <file>icons/Path_OpCopy.svg</file>
         <file>icons/Path_OperationA.svg</file>
@@ -111,6 +112,7 @@
         <file>panels/PageOpDrillingEdit.ui</file>
         <file>panels/PageOpEngraveEdit.ui</file>
         <file>panels/PageOpHelixEdit.ui</file>
+        <file>panels/PageOpOMIEdit.ui</file>
         <file>panels/PageOpPocketExtEdit.ui</file>
         <file>panels/PageOpPocketFullEdit.ui</file>
         <file>panels/PageOpProbeEdit.ui</file>

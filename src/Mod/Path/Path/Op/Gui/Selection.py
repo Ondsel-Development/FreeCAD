@@ -365,6 +365,7 @@ def select(op):
     opsel["Adaptive"] = adaptiveselect
     opsel["Vcarve"] = vcarveselect
     opsel["Probe"] = probeselect
+    opsel["OMI"] = probeselect
     opsel["Custom"] = customselect
     opsel["ThreadMilling"] = drillselect
     opsel["TurnFace"] = turnselect
