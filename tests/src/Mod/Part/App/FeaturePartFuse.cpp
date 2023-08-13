@@ -49,13 +49,13 @@ TEST_F(FeaturePartFuseTest, simpleBoxCylinderFusionHistory) // NOLINT
     _doc->addObject("Part::Cylinder","Cylinder");
     Part::Cylinder* cylinder = dynamic_cast<Part::Cylinder*>(_doc->getObject("Cylinder"));
     cylinder->execute();
+    std::vector<App::DocumentObject *> boxAndCylinder = {box, cylinder};
 
     // Act
     _doc->addObject("Part::MultiFuse", "Fusion");
     Part::MultiFuse* fusion = dynamic_cast<Part::MultiFuse*>(_doc->getObject("Fusion"));
-    std::vector<App::DocumentObject *> x = {box, cylinder};
     auto historySizeBefore = fusion->History.getSize();
-    fusion->Shapes.setValues(x);
+    fusion->Shapes.setValues(boxAndCylinder);
     fusion->execute();
     auto historySizeAfter = fusion->History.getSize();
 
