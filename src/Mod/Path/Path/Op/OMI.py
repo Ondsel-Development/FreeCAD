@@ -432,7 +432,7 @@ def Create(name, obj=None, parentJob=None):
 
 def SetupProperties():
     # setup = ["Xoffset", "Yoffset", "PointCountX", "PointCountY", "OutputFileName"]
-    setup = []
+    setup = ["ToolController", "OutputFileName"]
     return setup
 
 
