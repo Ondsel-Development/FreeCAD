@@ -49,55 +49,154 @@ translate = FreeCAD.Qt.translate
 
 
 class TaskPanelOpPage(PathOpGui.TaskPanelPage):
+    #class TaskPanelOpPage(PathOpGui.TaskPanelBaseLocationPage):
     """Page controller class for the Probing operation."""
+
+    DataLocation = QtCore.Qt.ItemDataRole.UserRole
+
+    def __init__(self, obj, features):
+        super().__init__(obj, features)
+
+        self.editRow = None
+        self.panelTitle = 'Probing Locations'
 
     def getForm(self):
         """getForm() ... returns UI"""
-        return FreeCADGui.PySideUic.loadUi(":/panels/PageOpOMIEdit.ui")
+        self.form =  FreeCADGui.PySideUic.loadUi(":/panels/PageOpOMIEdit.ui")
+        
+        if QtCore.qVersion()[0] == "4":
+            self.form.baseList.horizontalHeader().setResizeMode(
+                QtGui.QHeaderView.Stretch
+            )
+        else:
+            self.form.baseList.horizontalHeader().setSectionResizeMode(
+                QtGui.QHeaderView.Stretch
+            )
+
+        self.getPoint = PathGetPoint.TaskPanel(self.form.addRemoveEdit)
+        self.getPoint.formPoint.globalZLabel.setEnabled(True)
+        self.getPoint.formPoint.ZGlobal.setEnabled(True)
+        return self.form
+
+    def modifyStandardButtons(self, buttonBox):
+        self.getPoint.buttonBox = buttonBox
 
     def getFields(self, obj):
         """getFields(obj) ... transfers values from UI to obj's properties"""
         self.updateToolController(obj, self.form.toolController)
-        #PathGuiUtil.updateInputField(obj, "Xoffset", self.form.Xoffset)
-        #PathGuiUtil.updateInputField(obj, "Yoffset", self.form.Yoffset)
-        #obj.PointCountX = self.form.PointCountX.value()
-        #obj.PointCountY = self.form.PointCountY.value()
         obj.OutputFileName = str(self.form.OutputFileName.text())
-        tags = []
-        index = self.form.lwTags.currentRow()
-        for i in range(0, self.form.lwTags.count()):
-            item = self.form.lwTags.item(i)
-            enabled = item.checkState() == QtCore.Qt.CheckState.Checked
-            x = item.data(self.DataX)
-            y = item.data(self.DataY)
-            z = item.data(self.DataZ)
-            # print("(%.2f, %.2f) i=%d/%s" % (x, y, i, index))
-            tags.append((x, y, z, enabled))
-        self.tags = tags
+        #self.updateLocations()
 
     def setFields(self, obj):
         """setFields(obj) ... transfers obj's property values to UI"""
         self.setupToolController(obj, self.form.toolController)
-        #self.form.Xoffset.setText(
-        #    FreeCAD.Units.Quantity(obj.Xoffset.Value, FreeCAD.Units.Length).UserString
-        #)
-        #self.form.Yoffset.setText(
-        #    FreeCAD.Units.Quantity(obj.Yoffset.Value, FreeCAD.Units.Length).UserString
-        #)
         self.form.OutputFileName.setText(obj.OutputFileName)
-        #self.form.PointCountX.setValue(obj.PointCountX)
-        #self.form.PointCountY.setValue(obj.PointCountY)
+        self.setLocations(obj)
+    
+    def setLocations(self, obj):
+        #print('setLocations', self.getPoint.pt)
+        print('setLocations', self.getPoint.point)
+        self.form.baseList.blockSignals(True)
+        self.form.baseList.clearContents()
+        self.form.baseList.setRowCount(0)
+        #print(self.DataLocation.values)
+        for location in self.obj.Locations:
+            self.form.baseList.insertRow(self.form.baseList.rowCount())
+            
+            coords = (location.x, location.y, location.z)
+            #print(location)
+            for i, coord in enumerate(coords):  
+                item = QtGui.QTableWidgetItem("%.2f" % coord)
+                item.setData(self.DataLocation, coord)
+                self.form.baseList.setItem(self.form.baseList.rowCount() - 1, i, item)
+
+        self.form.baseList.resizeColumnToContents(0)
+        self.form.baseList.blockSignals(False)
+        self.itemActivated()
+
+    def removeLocation(self):
+        deletedRows = []
+        selected = self.form.baseList.selectedItems()
+        for item in selected:
+            row = self.form.baseList.row(item)
+            if row not in deletedRows:
+                deletedRows.append(row)
+                self.form.baseList.removeRow(row)
+        self.updateLocations()
+        FreeCAD.ActiveDocument.recompute()
+
+    def updateLocations(self):
+        Path.Log.track()
+        locations = []
+        for i in range(self.form.baseList.rowCount()):
+            x = self.form.baseList.item(i, 0).data(self.DataLocation)
+            y = self.form.baseList.item(i, 1).data(self.DataLocation)
+            z = self.form.baseList.item(i, 2).data(self.DataLocation)
+            location = FreeCAD.Vector(x, y, z)
+            locations.append(location)
+        self.obj.Locations = locations
+
+    def addLocation(self):
+        self.getPoint.getPoint(self.addLocationAt)
+
+    def addLocationAt(self, point, obj):
+        if point:
+            #print('addLocationAt',point)
+            locations = self.obj.Locations
+            locations.append(point)
+            self.obj.Locations = locations
+            FreeCAD.ActiveDocument.recompute()
+
+    def editLocation(self):
+        selected = self.form.baseList.selectedItems()
+        if selected:
+            row = self.form.baseList.row(selected[0])
+            self.editRow = row
+            x = self.form.baseList.item(row, 0).data(self.DataLocation)
+            y = self.form.baseList.item(row, 1).data(self.DataLocation)
+            z = self.form.baseList.item(row, 2).data(self.DataLocation)
+            start = FreeCAD.Vector(x, y, z)
+            self.getPoint.getPoint(self.editLocationAt, start)
+
+    def editLocationAt(self, point, obj):
+        if point:
+            self.form.baseList.item(self.editRow, 0).setData(
+                self.DataLocation, point.x
+            )
+            self.form.baseList.item(self.editRow, 1).setData(
+                self.DataLocation, point.y
+            )
+            self.form.baseList.item(self.editRow, 2).setData(
+                self.DataLocation, point.z
+            )
+            self.updateLocations()
+            FreeCAD.ActiveDocument.recompute()
+
+    def itemActivated(self):
+        if self.form.baseList.selectedItems():
+            self.form.removeLocation.setEnabled(True)
+            self.form.editLocation.setEnabled(True)
+        else:
+            self.form.removeLocation.setEnabled(False)
+            self.form.editLocation.setEnabled(False)
+
+    def registerSignalHandlers_off(self, obj): 
+        self.form.baseList.itemSelectionChanged.connect(self.itemActivated)
+        self.form.addLocation.clicked.connect(self.addLocation)
+        self.form.removeLocation.clicked.connect(self.removeLocation)
+        self.form.editLocation.clicked.connect(self.editLocation)
 
     def getSignalsForUpdate(self, obj):
         """getSignalsForUpdate(obj) ... return list of signals for updating obj"""
         signals = []
         signals.append(self.form.toolController.currentIndexChanged)
-        #signals.append(self.form.PointCountX.valueChanged)
-        #signals.append(self.form.PointCountY.valueChanged)
         signals.append(self.form.OutputFileName.editingFinished)
-        #signals.append(self.form.Xoffset.valueChanged)
-        #signals.append(self.form.Yoffset.valueChanged)
         self.form.SetOutputFileName.clicked.connect(self.SetOutputFileName)
+        
+        self.form.baseList.itemSelectionChanged.connect(self.itemActivated)
+        self.form.addLocation.clicked.connect(self.addLocation)
+        self.form.removeLocation.clicked.connect(self.removeLocation)
+        self.form.editLocation.clicked.connect(self.editLocation)
         return signals
 
     def SetOutputFileName(self):
@@ -110,6 +209,30 @@ class TaskPanelOpPage(PathOpGui.TaskPanelPage):
         if filename and filename[0]:
             self.obj.OutputFileName = str(filename[0])
             self.setFields(self.obj)
+
+
+    def pageUpdateData(self, obj, prop):
+        if prop in ["Locations"]:
+            self.setLocations(obj)
+        #self.updateData(obj, prop)
+    
+    def updateData_off(self, obj, prop):
+        print('updateData prop', prop)
+        print(obj.Name)
+        if prop in ['Location']:
+            self.setLocations(obj)
+        #    self.addLocation()#self.setFields(obj)
+'''
+class TaskPanelBaseLocationPage(PathOpGui.TaskPanelBaseLocationPage):
+
+    def __init__(self, obj, features):
+        super(TaskPanelBaseLocationPage, self).__init__(obj, features)
+        
+        self.panelTitle = "Probing Location"
+
+    def getTitle(self, obj):
+        return translate("PathOp", "Probing Location")
+'''
 
 class ProbingPointMarker:
     def __init__(self, point, colors):
