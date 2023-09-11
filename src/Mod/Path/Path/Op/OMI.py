@@ -198,12 +198,22 @@ class ProbingOp:
         fp = self.obj
         normal = FreeCAD.Vector(0,0,0)
         
-        for face in fp.Reference.Shape.Faces:
+        distances = []
+        params = []
+        faces = fp.Reference.Shape.Faces
+        for face in faces:
             u, v = face.Surface.parameter(fp.AnchorPoint)
             projPoint = face.valueAt(u, v)
             distance = fp.AnchorPoint.distanceToPoint(projPoint)
-            if Path.Geom.isRoughly(distance, 0):
-                normal += face.normalAt(u, v)
+            distances.append(distance)
+            params.append((u, v))
+        distMin = min(distances)
+        tuples = []
+        for d,p,f in zip(distances, params, faces):
+            if Path.Geom.isRoughly(d, distMin):
+                tuples.append((p,f))
+        for (u, v), face in tuples:
+            normal += face.normalAt(u, v)
 
         fp.Normal = normal.normalize() 
         fp.Point = fp.AnchorPoint + fp.Normal * probeDiameter/2
@@ -251,45 +261,45 @@ class ProbingToolOp(ProbingOp):
         
         super().__init__(obj, reference, location)
 
-    def setAnchorPoint(self, point, tol = 1e-2):
+    def setAnchorPoint(self, point):
         # Missing concavity check and correction
         Path.Log.track()
         fp = self.obj
-        fp.AnchorPoint = point
         probingPoints = []
         origin = FreeCAD.Vector(0, 0, 0)
         zDir = FreeCAD.Vector(0, 0, 1)
-        if not fp.RefShape.isInside(point, tol, False):
-            raise ValueError(f'Point {point} outside the path {fp.Reference} for tol={tol}.')
-        else: 
-            fp.ToolShape = fp.ToolShape.translated(point)
-            validEdge = None
-            for edge in fp.RefShape.Edges:
-                if isPointOnEdge(point, edge):
-                    validEdge = edge
+         
+        distMin = None
+        for edge in fp.RefShape.Edges:
+            param = edge.Curve.parameter(point)
+            projPoint = edge.valueAt(param)
+            distance = point.distanceToPoint(projPoint)
+            if distMin is None or distMin > distance:
+                distMin = distance
+                fp.AnchorPoint = projPoint
+                tangent = edge.tangentAt(param)
+      
+        point = fp.AnchorPoint
+        fp.ToolShape = fp.ToolShape.translated(point)
+        
+        if tangent.cross(zDir) == origin: 
+            distMin = None
+            vectorsMin = None
+            for model in fp.RefModels:
+                dist, vectors, _ = fp.ToolShape.distToShape(model.Shape)
+                if distMin is None or distMin > dist:
+                    distMin = dist
+                    vectorsMin = vectors
+
+            for pair in vectorsMin:
+                v = pair[0]
+                dx = v - point
+                if not Path.Geom.isRoughly(dx.Length, 0):
+                    tangent = dx.cross(zDir)
                     continue
-            
-            param = validEdge.Curve.parameter(point)
-            tangent = validEdge.tangentAt(param)
 
-            if tangent.cross(zDir) == origin: 
-                distMin = None
-                vectorsMin = None
-                for model in fp.RefModels:
-                    dist, vectors, _ = fp.ToolShape.distToShape(model.Shape)
-                    if distMin is None or distMin > dist:
-                        distMin = dist
-                        vectorsMin = vectors
-
-                for pair in vectorsMin:
-                    v = pair[0]
-                    dx = v - point
-                    if not Path.Geom.isRoughly(dx.Length, 0):
-                        tangent = dx.cross(zDir)
-                        continue
-
-            profileNormal = tangent.projectToPlane(origin, zDir)
-            fp.ProfileNormal = profileNormal.normalize()
+        profileNormal = tangent.projectToPlane(origin, zDir)
+        fp.ProfileNormal = profileNormal.normalize()
         
     def setAllowedRegion(self, probeDiameter):
         """
@@ -309,8 +319,8 @@ class ProbingToolOp(ProbingOp):
     def setVectors(self, probeDiameter, tol = 1e-4):
         fp = self.obj
         self.setAllowedRegion(probeDiameter)
+        distMin = None
         if fp.Point == FreeCAD.Vector(0,0,0):
-            distMin = None
             for model in fp.RefModels:
                 dist, vectors, info = fp.AllowedRegion.distToShape(model.Shape)
                 if distMin is None or dist < distMin:
@@ -318,20 +328,21 @@ class ProbingToolOp(ProbingOp):
                     fp.Point = vectors[0][0]
                     normal = fp.Point - vectors[0][1]
                     fp.Normal = normal.normalize()
-        elif fp.AllowedRegion.isInside(fp.Point, tol, False):
+        #elif fp.AllowedRegion.isInside(fp.Point, tol, False):
+        else:
             for edge in fp.AllowedRegion.Edges:
                 param = edge.Curve.parameter(fp.Point)
-                if isPointOnEdge(fp.Point, edge):
+                projPoint = edge.valueAt(param)
+                distance = fp.Point.distanceToPoint(projPoint)
+                if distMin is None or distMin > distance:
+                    distMin = distance
+                    point = projPoint
                     tan = edge.tangentAt(param)
-                    print('second conditional in setVectors')
-                    print(tan)
                     #normal = tan.cross(fp.ProfileNormal)
                     normal = fp.ProfileNormal.cross(tan)
-                    fp.Normal = normal.normalize()
-                    #continue
-        else:
-            fp.Point = FreeCAD.Vector(0,0,0)
-            self.setVectors(probeDiameter, tol)
+          
+            fp.Point = point
+            fp.Normal = normal.normalize()
 
 def Create(name, obj=None, parentJob=None):
    """Create(name) ... Creates and returns a Probing operation."""

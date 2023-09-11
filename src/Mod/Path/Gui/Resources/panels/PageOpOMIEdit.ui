@@ -29,17 +29,17 @@
       <property name="bottomMargin">
        <number>0</number>
       </property>
-      <item row="0" column="0">
-       <widget class="QLabel" name="labelToolController">
-        <property name="text">
-         <string>Tool Controller</string>
-        </property>
-       </widget>
-      </item>
       <item row="0" column="1">
        <widget class="QComboBox" name="toolController">
         <property name="toolTip">
          <string>The tool and its settings to be used for this operation</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelToolController">
+        <property name="text">
+         <string>Tool Controller</string>
         </property>
        </widget>
       </item>
@@ -49,17 +49,24 @@
    <item>
     <widget class="QGroupBox" name="gbOutputFile">
      <property name="title">
-      <string>Output</string>
+      <string>Parameters</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_4">
-      <item row="0" column="0">
+      <item row="1" column="0">
        <widget class="QLabel" name="labelFileName">
         <property name="text">
-         <string>File Name</string>
+         <string>Output</string>
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
+      <item row="1" column="2">
+       <widget class="QToolButton" name="SetOutputFileName">
+        <property name="text">
+         <string notr="true">...</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
        <widget class="QLineEdit" name="OutputFileName">
         <property name="toolTip">
          <string>Enter the filename where the probe points should be written</string>
@@ -69,24 +76,27 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="2">
-       <widget class="QToolButton" name="SetOutputFileName">
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelDistance">
         <property name="text">
-         <string notr="true">...</string>
+         <string>Probing Distance</string>
         </property>
        </widget>
+      </item>
+      <item row="0" column="1" colspan="2">
+       <widget class="QDoubleSpinBox" name="sbDistance"/>
       </item>
      </layout>
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="cbGeneration">
+    <widget class="QGroupBox" name="gbGeneration">
      <property name="title">
       <string>Auto Generate</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_5">
-      <item row="1" column="0">
-       <widget class="QSpinBox" name="sbCount">
+      <item row="1" column="2">
+       <widget class="QSpinBox" name="sbCountGen">
         <property name="minimum">
          <number>1</number>
         </property>
@@ -95,13 +105,37 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QPushButton" name="pbGenerate">
+      <item row="2" column="2">
+       <widget class="QPushButton" name="pbReplaceGen">
         <property name="enabled">
          <bool>false</bool>
         </property>
         <property name="text">
          <string>Replace All</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLabel" name="labelNumberPoints">
+        <property name="text">
+         <string>Number of points</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QPushButton" name="pbAddGen">
+        <property name="text">
+         <string>Add</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QComboBox" name="cbReferenceGen"/>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLabel" name="labelReference">
+        <property name="text">
+         <string>Reference</string>
         </property>
        </widget>
       </item>
@@ -114,17 +148,17 @@
       <item row="1" column="0">
        <widget class="QWidget" name="addRemoveEdit" native="true">
         <layout class="QGridLayout" name="gridLayout_2">
-         <item row="0" column="3">
-          <widget class="QPushButton" name="editLocation">
+         <item row="0" column="1">
+          <widget class="QPushButton" name="addLocation">
            <property name="toolTip">
-            <string>Edit selected location.</string>
+            <string>Opens a dialog to add arbitrary locations.</string>
            </property>
            <property name="text">
-            <string>Edit</string>
+            <string>Add</string>
            </property>
           </widget>
          </item>
-         <item row="0" column="2">
+         <item row="0" column="3">
           <widget class="QPushButton" name="removeLocation">
            <property name="toolTip">
             <string>Remove selected location from the list. The operation is no longer applied to them.</string>
@@ -134,13 +168,13 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="1">
-          <widget class="QPushButton" name="addLocation">
-           <property name="toolTip">
-            <string>Opens a dialog to add arbitrary locations.</string>
+         <item row="0" column="2">
+          <widget class="QPushButton" name="stopAddition">
+           <property name="enabled">
+            <bool>false</bool>
            </property>
            <property name="text">
-            <string>Add</string>
+            <string>Stop</string>
            </property>
           </widget>
          </item>
@@ -152,6 +186,11 @@
         <property name="toolTip">
          <string>List of locations to be processed.</string>
         </property>
+        <column>
+         <property name="text">
+          <string>Reference</string>
+         </property>
+        </column>
         <column>
          <property name="text">
           <string>X</string>
