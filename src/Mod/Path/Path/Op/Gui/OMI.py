@@ -29,6 +29,11 @@ import Path.Op.Gui.Base as PathOpGui
 import Path.Op.OMI as PathOMI
 import PathGui
 
+# lazily loaded modules
+from lazy_loader.lazy_loader import LazyLoader
+
+Draft = LazyLoader("Draft", globals(), "Draft")
+
 from PySide.QtCore import QT_TRANSLATE_NOOP
 from PySide import QtCore, QtGui
 from pivy import coin
@@ -47,23 +52,26 @@ else:
 
 translate = FreeCAD.Qt.translate
 
+#def getPointData():
 
+#class TaskPanelOpPage(PathOpGui.TaskPanelBaseGeometryPage):
 class TaskPanelOpPage(PathOpGui.TaskPanelPage):
-    #class TaskPanelOpPage(PathOpGui.TaskPanelBaseLocationPage):
     """Page controller class for the Probing operation."""
 
     DataLocation = QtCore.Qt.ItemDataRole.UserRole
+    DataReference = QtCore.Qt.ItemDataRole.UserRole + 1
 
-    def __init__(self, obj, features):
-        super().__init__(obj, features)
-
+    #def __init__(self, obj, features):
+    #    super().__init__(obj, features)
+       
+    def initPage(self, obj):
         self.editRow = None
         self.panelTitle = 'Probing Locations'
 
     def getForm(self):
         """getForm() ... returns UI"""
         self.form =  FreeCADGui.PySideUic.loadUi(":/panels/PageOpOMIEdit.ui")
-        
+       
         if QtCore.qVersion()[0] == "4":
             self.form.baseList.horizontalHeader().setResizeMode(
                 QtGui.QHeaderView.Stretch
@@ -72,43 +80,69 @@ class TaskPanelOpPage(PathOpGui.TaskPanelPage):
             self.form.baseList.horizontalHeader().setSectionResizeMode(
                 QtGui.QHeaderView.Stretch
             )
-
-        self.getPoint = PathGetPoint.TaskPanel(self.form.addRemoveEdit)
-        self.getPoint.formPoint.globalZLabel.setEnabled(True)
-        self.getPoint.formPoint.ZGlobal.setEnabled(True)
+        
         return self.form
-
-    def modifyStandardButtons(self, buttonBox):
-        self.getPoint.buttonBox = buttonBox
 
     def getFields(self, obj):
         """getFields(obj) ... transfers values from UI to obj's properties"""
+        #print('getFields got activated')
         self.updateToolController(obj, self.form.toolController)
+        distance = FreeCAD.Units.Quantity(self.form.sbDistance.text())
+        obj.ProbingDistance = distance.Value
         obj.OutputFileName = str(self.form.OutputFileName.text())
-        #self.updateLocations()
 
     def setFields(self, obj):
         """setFields(obj) ... transfers obj's property values to UI"""
+        #print('setFields got activated')
         self.setupToolController(obj, self.form.toolController)
+        references = []
+        for item in self.job.Operations.Group:
+            if not isinstance(item.Proxy, PathOMI.ObjectOMI):
+                references.append(item.Name)
+        references.append(self.job.Model.Name)
+        self.form.cbReferenceGen.addItems(references)
+        diameter = obj.ToolController.Tool.Diameter.Value
+        probingDistance = max(obj.ProbingDistance, diameter)
+        #Is it appropiate to set the obj attributes with this method?
+        obj.ProbingDistance = probingDistance
+        self.form.sbDistance.setValue(probingDistance)
         self.form.OutputFileName.setText(obj.OutputFileName)
         self.setLocations(obj)
-    
+   
+    def replaceLocations(self):
+        self.form.baseList.blockSignals(True)
+        for row in range(self.form.baseList.rowCount()):
+            self.form.baseList.removeRow(0)
+        for pL in self.obj.ProbingLocations:
+            self.obj.Document.removeObject(pL.Name)
+        self.form.baseList.blockSignals(False)
+        self.genLocations()
+
+    def genLocations(self):
+        referenceName = self.form.cbReferenceGen
+        n = int(self.form.sbCountGen.text())
+        
+        FreeCAD.ActiveDocument.recompute()
+
     def setLocations(self, obj):
-        #print('setLocations', self.getPoint.pt)
-        print('setLocations', self.getPoint.point)
         self.form.baseList.blockSignals(True)
         self.form.baseList.clearContents()
         self.form.baseList.setRowCount(0)
-        #print(self.DataLocation.values)
-        for location in self.obj.Locations:
+        for probingLocation in obj.ProbingLocations:
+            ref_label = probingLocation.Reference.Label
+            location  = probingLocation.AnchorPoint
+            
             self.form.baseList.insertRow(self.form.baseList.rowCount())
             
+            item = QtGui.QTableWidgetItem(ref_label)
+            item.setData(self.DataReference, ref_label)
+            self.form.baseList.setItem(self.form.baseList.rowCount() - 1, 0, item)
+            
             coords = (location.x, location.y, location.z)
-            #print(location)
             for i, coord in enumerate(coords):  
-                item = QtGui.QTableWidgetItem("%.2f" % coord)
+                item = QtGui.QTableWidgetItem("%.3f" % coord)
                 item.setData(self.DataLocation, coord)
-                self.form.baseList.setItem(self.form.baseList.rowCount() - 1, i, item)
+                self.form.baseList.setItem(self.form.baseList.rowCount() - 1, i+1, item)
 
         self.form.baseList.resizeColumnToContents(0)
         self.form.baseList.blockSignals(False)
@@ -121,82 +155,87 @@ class TaskPanelOpPage(PathOpGui.TaskPanelPage):
             row = self.form.baseList.row(item)
             if row not in deletedRows:
                 deletedRows.append(row)
-                self.form.baseList.removeRow(row)
-        self.updateLocations()
+        for i in sorted(deletedRows)[::-1]:
+            self.form.baseList.removeRow(i)
+            pL = self.obj.ProbingLocations[i]
+            self.obj.Document.removeObject(pL.Name)
+        #self.updateLocations()
         FreeCAD.ActiveDocument.recompute()
 
     def updateLocations(self):
         Path.Log.track()
         locations = []
         for i in range(self.form.baseList.rowCount()):
-            x = self.form.baseList.item(i, 0).data(self.DataLocation)
-            y = self.form.baseList.item(i, 1).data(self.DataLocation)
-            z = self.form.baseList.item(i, 2).data(self.DataLocation)
+            x = self.form.baseList.item(i, 1).data(self.DataLocation)
+            y = self.form.baseList.item(i, 2).data(self.DataLocation)
+            z = self.form.baseList.item(i, 3).data(self.DataLocation)
             location = FreeCAD.Vector(x, y, z)
-            locations.append(location)
-        self.obj.Locations = locations
+            self.obj.ProbingLocations[i].Proxy.setAnchorPoint(location)
 
-    def addLocation(self):
-        self.getPoint.getPoint(self.addLocationAt)
-
-    def addLocationAt(self, point, obj):
-        if point:
-            #print('addLocationAt',point)
-            locations = self.obj.Locations
-            locations.append(point)
-            self.obj.Locations = locations
+    def addLocation(self, obj, sel):
+        Path.Log.track(sel)
+        last_selected = sel[-1]
+        if last_selected.PickedPoints:
+            point = last_selected.PickedPoints[-1]
+            ref = last_selected.Object
+            proxy = obj.Proxy
+            proxy.addProbingLocation(obj, ref, point)
+            FreeCADGui.Selection.clearSelection()
             FreeCAD.ActiveDocument.recompute()
+            #self.setDirty()
 
-    def editLocation(self):
-        selected = self.form.baseList.selectedItems()
-        if selected:
-            row = self.form.baseList.row(selected[0])
-            self.editRow = row
-            x = self.form.baseList.item(row, 0).data(self.DataLocation)
-            y = self.form.baseList.item(row, 1).data(self.DataLocation)
-            z = self.form.baseList.item(row, 2).data(self.DataLocation)
-            start = FreeCAD.Vector(x, y, z)
-            self.getPoint.getPoint(self.editLocationAt, start)
+    def addActivated(self):
+        # Quick shorcut before understanding where the 
+        # SelectionGate comes from and restore after 
+        # task completion
+        FreeCADGui.Selection.removeSelectionGate()
+       
+        self.form.addLocation.setEnabled(False)
+        self.form.stopAddition.setEnabled(True)
 
-    def editLocationAt(self, point, obj):
-        if point:
-            self.form.baseList.item(self.editRow, 0).setData(
-                self.DataLocation, point.x
-            )
-            self.form.baseList.item(self.editRow, 1).setData(
-                self.DataLocation, point.y
-            )
-            self.form.baseList.item(self.editRow, 2).setData(
-                self.DataLocation, point.z
-            )
-            self.updateLocations()
-            FreeCAD.ActiveDocument.recompute()
+    def stopAddition(self):
+        self.form.addLocation.setEnabled(True)
+        self.form.stopAddition.setEnabled(False)
 
     def itemActivated(self):
         if self.form.baseList.selectedItems():
             self.form.removeLocation.setEnabled(True)
-            self.form.editLocation.setEnabled(True)
         else:
             self.form.removeLocation.setEnabled(False)
-            self.form.editLocation.setEnabled(False)
 
-    def registerSignalHandlers_off(self, obj): 
+    def activateReplace(self):
+        if self.form.baseList.rowCount:
+            self.form.pbReplaceGen.setEnabled(True)
+        else:
+            self.form.pbReplaceGen.setEnabled(False)
+
+    def changeDistance(self):
+        distance = FreeCAD.Units.Quantity(self.form.sbDistance.text())
+        self.obj.ProbingDistance = distance.Value
+        FreeCAD.ActiveDocument.recompute()
+
+    def registerSignalHandlers(self, obj): 
         self.form.baseList.itemSelectionChanged.connect(self.itemActivated)
-        self.form.addLocation.clicked.connect(self.addLocation)
+        #print([item for item in dir(self.form.baseList) if hasattr(getattr(self.form.baseList, item), 'connect')])
+        self.form.baseList.itemEntered.connect(self.activateReplace)
+        #self.form.baseList.destroyed.connect(self.activateReplace)
+        self.form.sbDistance.valueChanged.connect(self.changeDistance)
+        self.form.pbAddGen.clicked.connect(self.genLocations)
+        self.form.pbReplaceGen.clicked.connect(self.replaceLocations)
+        self.form.addLocation.clicked.connect(self.addActivated)
+        self.form.stopAddition.clicked.connect(self.stopAddition)
         self.form.removeLocation.clicked.connect(self.removeLocation)
-        self.form.editLocation.clicked.connect(self.editLocation)
+        self.form.SetOutputFileName.clicked.connect(self.SetOutputFileName)
 
     def getSignalsForUpdate(self, obj):
         """getSignalsForUpdate(obj) ... return list of signals for updating obj"""
         signals = []
         signals.append(self.form.toolController.currentIndexChanged)
+        #print(dir(self.form.sbDistance))
+        #self.form.sbDistance.valueChanged(self.
+        #signals.append(self.form.sbDistance.valueChanged)
         signals.append(self.form.OutputFileName.editingFinished)
-        self.form.SetOutputFileName.clicked.connect(self.SetOutputFileName)
         
-        self.form.baseList.itemSelectionChanged.connect(self.itemActivated)
-        self.form.addLocation.clicked.connect(self.addLocation)
-        self.form.removeLocation.clicked.connect(self.removeLocation)
-        self.form.editLocation.clicked.connect(self.editLocation)
         return signals
 
     def SetOutputFileName(self):
@@ -210,224 +249,21 @@ class TaskPanelOpPage(PathOpGui.TaskPanelPage):
             self.obj.OutputFileName = str(filename[0])
             self.setFields(self.obj)
 
-
-    def pageUpdateData(self, obj, prop):
-        if prop in ["Locations"]:
-            self.setLocations(obj)
-        #self.updateData(obj, prop)
-    
-    def updateData_off(self, obj, prop):
-        print('updateData prop', prop)
-        print(obj.Name)
-        if prop in ['Location']:
+    def updateData(self, obj, prop):
+        #print('updateData prop', prop)
+        #print(obj.Name)
+        if prop in ['ProbingLocations']:
             self.setLocations(obj)
         #    self.addLocation()#self.setFields(obj)
-'''
-class TaskPanelBaseLocationPage(PathOpGui.TaskPanelBaseLocationPage):
 
-    def __init__(self, obj, features):
-        super(TaskPanelBaseLocationPage, self).__init__(obj, features)
-        
-        self.panelTitle = "Probing Location"
-
-    def getTitle(self, obj):
-        return translate("PathOp", "Probing Location")
-'''
-
-class ProbingPointMarker:
-    def __init__(self, point, colors):
-        self.point = point
-        self.color = colors
-        self.sep = coin.SoSeparator()
-        self.pos = coin.SoTranslation()
-        self.pos.translation = (point.x, point.y, point.z)
-        self.sphere = coin.SoSphere()
-        self.scale = coin.SoType.fromName("SoShapeScale").createInstance()
-        self.scale.setPart("shape", self.sphere)
-        self.scale.scaleFactor.setValue(7)
-        self.material = coin.SoMaterial()
-        self.sep.addChild(self.pos)
-        self.sep.addChild(self.material)
-        self.sep.addChild(self.scale)
-        self.enabled = True
-        self.selected = False
-
-    def setSelected(self, select):
-        self.selected = select
-        self.sphere.radius = 1.5 if select else 1.0
-        self.setEnabled(self.enabled)
-
-    def setEnabled(self, enabled):
-        self.enabled = enabled
-        if enabled:
-            self.material.diffuseColor = (
-                self.color[0] if not self.selected else self.color[2]
-            )
-            self.material.transparency = 0.0
-        else:
-            self.material.diffuseColor = (
-                self.color[1] if not self.selected else self.color[2]
-            )
-            self.material.transparency = 0.6
-
-class ViewProviderProbingPoint(PathOpGui.ViewProvider):
-    def __init__(self, vobj, resources):
-        super().__init(vobj, resources)
-
-        # initialized later
-        self.obj = None
-        self.tags = None
-        self.switch = None
-        self.colors = None
-
-    def setupColors(self):
-        def colorForColorValue(val):
-            v = [((val >> n) & 0xFF) / 255.0 for n in [24, 16, 8, 0]]
-            return coin.SbColor(v[0], v[1], v[2])
-
-        pref = Path.Preferences.preferences()
-        #                                     R         G          B          A
-        npc = pref.GetUnsigned(
-            "DefaultPathMarkerColor", ((85 * 256 + 255) * 256 + 0) * 256 + 255
-        )
-        hpc = pref.GetUnsigned(
-            "DefaultHighlightPathColor", ((255 * 256 + 125) * 256 + 0) * 256 + 255
-        )
-        dpc = pref.GetUnsigned(
-            "DefaultDisabledPathColor", ((205 * 256 + 205) * 256 + 205) * 256 + 154
-        )
-        self.colors = [
-            colorForColorValue(npc),
-            colorForColorValue(dpc),
-            colorForColorValue(hpc),
-        ]
-
-    def attach(self, vobj):
-        Path.Log.track()
-        self.setupColors()
-        self.vobj = vobj
-        self.obj = vobj.Object
-        self.tags = []
-        self.switch = coin.SoSwitch()
-        vobj.RootNode.addChild(self.switch)
-        self.turnMarkerDisplayOn(False)
-
-        if self.obj and self.obj.Base:
-            for i in self.obj.Base.InList:
-                if hasattr(i, "Group") and self.obj.Base.Name in [
-                    o.Name for o in i.Group
-                ]:
-                    i.Group = [o for o in i.Group if o.Name != self.obj.Base.Name]
-            if self.obj.Base.ViewObject:
-                self.obj.Base.ViewObject.Visibility = False
-            # if self.debugDisplay() and self.vobj.Debug.ViewObject:
-            #    self.vobj.Debug.ViewObject.Visibility = False
-
-    def turnMarkerDisplayOn(self, display):
-        sw = coin.SO_SWITCH_ALL if display else coin.SO_SWITCH_NONE
-        self.switch.whichChild = sw
-
-    def claimChildren(self):
-        Path.Log.track()
-        # if self.debugDisplay():
-        #    return [self.obj.Base, self.vobj.Debug]
-        return [self.obj.Base]
-
-    def onDelete(self, arg1=None, arg2=None):
-        """this makes sure that the base operation is added back to the job and visible"""
-        Path.Log.track()
-        if self.obj.Base and self.obj.Base.ViewObject:
-            self.obj.Base.ViewObject.Visibility = True
-        job = PathUtils.findParentJob(self.obj)
-        if arg1.Object and arg1.Object.Base and job:
-            job.Proxy.addOperation(arg1.Object.Base, arg1.Object)
-            arg1.Object.Base = None
-        # if self.debugDisplay():
-        #    self.vobj.Debug.removeObjectsFromDocument()
-        #    self.vobj.Debug.Document.removeObject(self.vobj.Debug.Name)
-        #    self.vobj.Debug = None
-        return True
-
-    def updatePositions(self, positions, disabled):
-        for tag in self.tags:
-            self.switch.removeChild(tag.sep)
-        tags = []
-        for i, p in enumerate(positions):
-            tag = ProbePointMarker(p, self.colors)
-            tag.setEnabled(not i in disabled)
-            tags.append(tag)
-            self.switch.addChild(tag.sep)
-        self.tags = tags
-
-    def updateData(self, obj, propName):
-        Path.Log.track(propName)
-        if "Disabled" == propName:
-            self.updatePositions(obj.Positions, obj.Disabled)
-
-    def onModelChanged(self):
-        Path.Log.track()
-        # if self.debugDisplay():
-        #    self.vobj.Debug.removeObjectsFromDocument()
-        #    for solid in self.obj.Proxy.solids:
-        #        tag = self.obj.Document.addObject('Part::Feature', 'tag')
-        #        tag.Shape = solid
-        #        if tag.ViewObject and self.vobj.Debug.ViewObject:
-        #            tag.ViewObject.Visibility = self.vobj.Debug.ViewObject.Visibility
-        #            tag.ViewObject.Transparency = 80
-        #        self.vobj.Debug.addObject(tag)
-        #    tag.purgeTouched()
-
-    def setEdit(self, vobj, mode=0):
-        panel = TaskPanelOpPage(vobj.Object, self)
-        self.setupTaskPanel(panel)
-        return True
-
-    def unsetEdit(self, vobj, mode):
-        if hasattr(self, "panel") and self.panel:
-            self.panel.abort()
-
-    def setupTaskPanel(self, panel):
-        self.panel = panel
-        FreeCADGui.Control.closeDialog()
-        FreeCADGui.Control.showDialog(panel)
-        panel.setupUi()
-        FreeCADGui.Selection.addSelectionGate(self)
-        FreeCADGui.Selection.addObserver(self)
-
-    def clearTaskPanel(self):
-        self.panel = None
-        FreeCADGui.Selection.removeSelectionGate()
-        FreeCADGui.Selection.removeObserver(self)
-        self.turnMarkerDisplayOn(False)
-
-    # SelectionObserver interface
-
-    def selectTag(self, index):
-        Path.Log.track(index)
-        for i, tag in enumerate(self.tags):
-            tag.setSelected(i == index)
-
-    def tagAtPoint(self, point):
-        for i, tag in enumerate(self.tags):
-            if Path.Geom.pointsCoincide(
-                point, tag.point, tag.sphere.radius.getValue() * 1.3
-            ):
-                return i
-        return -1
-
-    def allow(self, doc, obj, sub):
-        if obj == self.obj:
-            return True
-        return False
-
-    def addSelection(self, doc, obj, sub, point):
-        Path.Log.track(doc, obj, sub, point)
-        if self.panel:
-            i = self.tagAtPoint(point, sub is None)
-            self.panel.selectTagWithId(i)
-        FreeCADGui.updateGui()
-
-
+    def updateSelection(self, obj, sel):
+        if not self.form.addLocation.isEnabled() and sel:
+            #print('pressed addLocation button detected on selection')
+            self.addLocation(obj, sel)
+        #if self.selectionSupportedAsBaseGeometry(sel, True):
+        #    self.form.addBase.setEnabled(True)
+        #else:
+        #    self.form.addBase.setEnabled(False)
 
 Command = PathOpGui.SetupOperation(
     "OMI",
