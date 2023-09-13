@@ -43,6 +43,9 @@ from PathTests.TestPathHelixGenerator import TestPathHelixGenerator
 from PathTests.TestPathLog import TestPathLog
 from PathTests.TestPathOpUtil import TestPathOpUtil
 
+# Probing
+from PathTests.TestPathProbeGenerator import TestPathProbeGenerator
+
 # from PathTests.TestPathPost import TestPathPost
 from PathTests.TestPathPost import TestPathPostUtils
 from PathTests.TestPathPost import TestBuildPostList
@@ -96,6 +99,7 @@ False if TestPathOpUtil.__name__ else True
 False if TestPathPostUtils.__name__ else True
 False if TestPathPreferences.__name__ else True
 False if TestPathProfile.__name__ else True
+False if TestPathProbeGenerator.__name__ else True
 False if TestPathPropertyBag.__name__ else True
 False if TestPathRotationGenerator.__name__ else True
 False if TestPathSetupSheet.__name__ else True
