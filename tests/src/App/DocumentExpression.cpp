@@ -48,33 +48,41 @@ TEST_F(DocumentExpression, spreadsheetBinding) // NOLINT
     auto* box = dynamic_cast<Part::Box*>(_doc->getObject("Box"));
     box->Label.setValue("Cube");
     box->execute();
-
     // >>> Add spreadsheet and set A1 to 4
     _doc->addObject("Spreadsheet::Sheet", "Spreadsheet");
     auto* spreadsheet = dynamic_cast<Spreadsheet::Sheet*>(_doc->getObject("Spreadsheet"));
     spreadsheet->setCell("A1", "4");
-    spreadsheet->execute();
     _doc->recompute();
 
-    //
-//    App::ObjectIdentifier p(ObjectIdentifier::parse(getDocumentObjectPtr(), path));
-//    const char * exprStr = PyUnicode_AsUTF8(expr);
-//    std::shared_ptr<Expression> shared_expr(Expression::parse(getDocumentObjectPtr(), exprStr));
-//    if (shared_expr && comment)
-//            shared_expr->comment = comment;
-//
-//    getDocumentObjectPtr()->setExpression(p, shared_expr);
-
-    auto boxLength = App::ObjectIdentifier::parse(box, "Length");
-    std::shared_ptr<App::Expression> expression(App::Expression::parse(box, "Spreadsheet.A1"));
-
-    // >>> Set Expression A1 to Box length
-    // App.getDocument('Unnamed').Box.setExpression('Length', u'Spreadsheet.A1')
-
     // Act
-    box->setExpression(boxLength, expression);
-
-    int xxxx = 4;
+    std::shared_ptr<App::Expression> expression(App::Expression::parse(box, "Spreadsheet.A1"));
+    box->setExpression(
+        App::ObjectIdentifier::parse(box, "Length"),
+        expression
+    );
+    _doc->recompute();
 
     // Assert
+    std::string a1Content;
+    spreadsheet->getCell(App::stringToAddress("A1"))->getStringContent(a1Content);
+    EXPECT_EQ(a1Content, "4");
+    auto length = box->Length.getValue();
+    EXPECT_EQ(length, 4.0);
+}
+
+TEST_F(DocumentExpression, documentPropertiesBinding) // NOLINT
+{
+    // Arrange
+    // >>> Add a box named "Cube"
+    _doc->addObject("Part::Box", "Box");
+    auto* box = dynamic_cast<Part::Box*>(_doc->getObject("Box"));
+    box->Label.setValue("Cube");
+    box->execute();
+    // >>> Set custom document property to 4, call it "box_length"
+
+    // Act
+
+    // Assert
+    auto length = box->Length.getValue();
+    EXPECT_EQ(length, 4.0);
 }
