@@ -54,6 +54,8 @@ JointTypes = [
 
 class Joint:
     def __init__(self, joint, type_index):
+        self.Type = "Joint"
+
         joint.Proxy = self
         self.joint = joint
 
@@ -132,6 +134,13 @@ class Joint:
 
         self.setJointConnectors([])
 
+    def __getstate__(self):
+        return self.Type
+
+    def __setstate__(self, state):
+        if state:
+            self.Type = state
+
     def onChanged(self, fp, prop):
         """Do something when a property has changed"""
         # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
@@ -171,6 +180,17 @@ class Joint:
             self.joint.Vertex2 = ""
             self.joint.Placement2 = UtilsAssembly.activeAssembly().Placement
 
+    def updateJCSPlacements(self):
+        print("updateJCSPlacements1")
+        self.joint.Placement1 = self.findPlacement(
+            self.joint.Object1, self.joint.Element1, self.joint.Vertex1
+        )
+        print("updateJCSPlacements2")
+        self.joint.Placement2 = self.findPlacement(
+            self.joint.Object2, self.joint.Element2, self.joint.Vertex2
+        )
+        print("updateJCSPlacements3")
+
     """
     So here we want to find a placement that corresponds to a local coordinate system that would be placed at the selected vertex.
     - obj is usually a App::Link to a PartDesign::Body, or primitive, fasteners. But can also be directly the object.1
@@ -182,7 +202,11 @@ class Joint:
     """
 
     def findPlacement(self, obj, elt, vtx):
-        plc = App.Placement(obj.Placement)
+        plc = App.Placement()
+
+        if not obj or not elt or not vtx:
+            return App.Placement()
+
         elt_type, elt_index = UtilsAssembly.extract_type_and_number(elt)
         vtx_type, vtx_index = UtilsAssembly.extract_type_and_number(vtx)
 
@@ -234,6 +258,7 @@ class Joint:
             if surface.TypeId == "Part::GeomPlane":
                 plc.Rotation = App.Rotation(surface.Rotation)
 
+        # Now plc is the placement in the doc. But we need the placement relative to the solid origin.
         return plc
 
 
@@ -453,3 +478,83 @@ class ViewProviderJoint:
         """When restoring the serialized object from document we have the chance to set some internals here.\
                 Since no data were serialized nothing needs to be done here."""
         return None
+
+
+################ Grounded Joint object #################
+
+
+class GroundedJoint:
+    def __init__(self, joint, obj_to_ground):
+        self.Type = "GoundedJoint"
+        joint.Proxy = self
+        self.joint = joint
+
+        joint.addProperty(
+            "App::PropertyLink",
+            "ObjectToGround",
+            "Ground",
+            QT_TRANSLATE_NOOP("App::Property", "The object to ground"),
+        )
+
+        joint.ObjectToGround = obj_to_ground
+
+        joint.addProperty(
+            "App::PropertyPlacement",
+            "Placement",
+            "Ground",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "This is where the part is grounded.",
+            ),
+        )
+
+        joint.Placement = obj_to_ground.Placement
+
+    def __getstate__(self):
+        return self.Type
+
+    def __setstate__(self, state):
+        if state:
+            self.Type = state
+
+    def onChanged(self, fp, prop):
+        """Do something when a property has changed"""
+        # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
+        pass
+
+    def execute(self, fp):
+        """Do something when doing a recomputation, this method is mandatory"""
+        # App.Console.PrintMessage("Recompute Python Box feature\n")
+        pass
+
+
+class ViewProviderGroundedJoint:
+    def __init__(self, obj):
+        """Set this object to the proxy object of the actual view provider"""
+        obj.Proxy = self
+
+    def attach(self, obj):
+        """Setup the scene sub-graph of the view provider, this method is mandatory"""
+        pass
+
+    def updateData(self, fp, prop):
+        """If a property of the handled feature has changed we have the chance to handle this here"""
+        # fp is the handled feature, prop is the name of the property that has changed
+        pass
+
+    def getDisplayModes(self, obj):
+        """Return a list of display modes."""
+        modes = ["Wireframe"]
+        return modes
+
+    def getDefaultDisplayMode(self):
+        """Return the name of the default display mode. It must be defined in getDisplayModes."""
+        return "Wireframe"
+
+    def onChanged(self, vp, prop):
+        """Here we can do something when a single property got changed"""
+        # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
+        pass
+
+    def getIcon(self):
+        return ":/icons/Assembly_ToggleGrounded.svg"

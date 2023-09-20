@@ -1,9 +1,13 @@
 include_directories(
     ${CMAKE_BINARY_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
+    ${OCC_INCLUDE_DIR}
 )
 
 set(AssemblyGui_LIBS
+    Assembly
+    PartDesign
+    PartGui
     FreeCADGui
 )
 
@@ -19,6 +23,14 @@ SOURCE_GROUP("Resources" FILES ${AssemblyResource_SRCS})
 
 
 SET(AssemblyGui_SRCS_Module
+    AppAssemblyGui.cpp
+    AppAssemblyGuiPy.cpp
+    PreCompiled.cpp
+    PreCompiled.h
+    ViewProviderAssembly.cpp
+    ViewProviderAssembly.h
+    ViewProviderJointGroup.cpp
+    ViewProviderJointGroup.h
     ${Assembly_QRC_SRCS}
 )
 
@@ -31,6 +43,11 @@ SET(AssemblyGui_SRCS
     ${AssemblyGui_SRCS_Module}
 )
 
+if(FREECAD_USE_PCH)
+    add_definitions(-D_PreComp_)
+    GET_MSVC_PRECOMPILED_SOURCE("PreCompiled.cpp" PCH_SRCS ${AssemblyGui_SRCS})
+    ADD_MSVC_PRECOMPILED_HEADER(PathGui PreCompiled.h PreCompiled.cpp PCH_SRCS)
+endif(FREECAD_USE_PCH)
 
 SET(AssemblyGuiIcon_SVG
     Resources/icons/AssemblyWorkbench.svg

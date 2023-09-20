@@ -49,7 +49,6 @@ class AssemblyWorkbench(Workbench):
     "Assembly workbench"
 
     def __init__(self):
-        print("Loading Assembly workbench...")
         self.__class__.Icon = (
             FreeCAD.getResourceDir() + "Mod/Assembly/Resources/icons/AssemblyWorkbench.svg"
         )
@@ -65,7 +64,7 @@ class AssemblyWorkbench(Workbench):
         # load the builtin modules
         from PySide import QtCore, QtGui
         from PySide.QtCore import QT_TRANSLATE_NOOP
-        import CommandCreateAssembly, CommandInsertLink, CommandCreateJoint
+        import CommandCreateAssembly, CommandInsertLink, CommandCreateJoint, CommandSolveAssembly
         from Preferences import PreferencesPage
 
         # from Preferences import preferences
@@ -76,8 +75,10 @@ class AssemblyWorkbench(Workbench):
         FreeCADGui.addPreferencePage(PreferencesPage, QT_TRANSLATE_NOOP("QObject", "Assembly"))
 
         # build commands list
-        cmdlist = ["Assembly_CreateAssembly", "Assembly_InsertLink"]
+        cmdlist = ["Assembly_CreateAssembly", "Assembly_InsertLink", "Assembly_SolveAssembly"]
         cmdListJoints = [
+            "Assembly_ToggleGrounded",
+            "Separator",
             "Assembly_CreateJointFixed",
             "Assembly_CreateJointRevolute",
             "Assembly_CreateJointCylindrical",

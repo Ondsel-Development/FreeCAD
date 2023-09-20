@@ -41,6 +41,24 @@ __author__ = "Ondsel"
 __url__ = "https://www.freecad.org"
 
 
+def getJointGroup(assembly):
+    joint_group = assembly.getObject("Joints")
+
+    if not joint_group:
+        joint_group = assembly.newObject("Assembly::JointGroup", "Joints")
+    return joint_group
+
+
+def jointCmdActivated(i):
+    assembly = UtilsAssembly.activeAssembly()
+    if not assembly:
+        return
+    view = Gui.activeDocument().activeView()
+
+    panel = TaskAssemblyCreateJoint(assembly, view, i)
+    Gui.Control.showDialog(panel)
+
+
 class CommandCreateJointFixed:
     def __init__(self):
         pass
@@ -51,10 +69,12 @@ class CommandCreateJointFixed:
             "Pixmap": "Assembly_CreateJointFixed",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointFixed", "Create Fixed Joint"),
             "Accel": "F",
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "ToolTip": "<p>"
+            + QT_TRANSLATE_NOOP(
                 "Assembly_CreateJointFixed",
-                "<p>Create a Fixed Joint: Permanently locks two parts together, preventing any movement or rotation.</p>",
-            ),
+                "Create a Fixed Joint: Permanently locks two parts together, preventing any movement or rotation.",
+            )
+            + "</p>",
             "CmdType": "ForEdit",
         }
 
@@ -62,13 +82,7 @@ class CommandCreateJointFixed:
         return UtilsAssembly.activeAssembly() is not None
 
     def Activated(self):
-        assembly = UtilsAssembly.activeAssembly()
-        if not assembly:
-            return
-        view = Gui.activeDocument().activeView()
-
-        self.panel = TaskAssemblyCreateJoint(assembly, view, 0)
-        Gui.Control.showDialog(self.panel)
+        jointCmdActivated(0)
 
 
 class CommandCreateJointRevolute:
@@ -81,10 +95,12 @@ class CommandCreateJointRevolute:
             "Pixmap": "Assembly_CreateJointRevolute",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointRevolute", "Create Revolute Joint"),
             "Accel": "R",
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "ToolTip": "<p>"
+            + QT_TRANSLATE_NOOP(
                 "Assembly_CreateJointRevolute",
-                "<p>Create a Revolute Joint: Allows rotation around a single axis between selected parts.</p>",
-            ),
+                "Create a Revolute Joint: Allows rotation around a single axis between selected parts.",
+            )
+            + "</p>",
             "CmdType": "ForEdit",
         }
 
@@ -92,13 +108,7 @@ class CommandCreateJointRevolute:
         return UtilsAssembly.activeAssembly() is not None
 
     def Activated(self):
-        assembly = UtilsAssembly.activeAssembly()
-        if not assembly:
-            return
-        view = Gui.activeDocument().activeView()
-
-        self.panel = TaskAssemblyCreateJoint(assembly, view, 1)
-        Gui.Control.showDialog(self.panel)
+        jointCmdActivated(1)
 
 
 class CommandCreateJointCylindrical:
@@ -113,10 +123,12 @@ class CommandCreateJointCylindrical:
                 "Assembly_CreateJointCylindrical", "Create Cylindrical Joint"
             ),
             "Accel": "C",
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "ToolTip": "<p>"
+            + QT_TRANSLATE_NOOP(
                 "Assembly_CreateJointCylindrical",
-                "<p>Create a Cylindrical Joint: Enables rotation along one axis while permitting movement along the same axis between assembled parts.</p>",
-            ),
+                "Create a Cylindrical Joint: Enables rotation along one axis while permitting movement along the same axis between assembled parts.",
+            )
+            + "</p>",
             "CmdType": "ForEdit",
         }
 
@@ -124,13 +136,7 @@ class CommandCreateJointCylindrical:
         return UtilsAssembly.activeAssembly() is not None
 
     def Activated(self):
-        assembly = UtilsAssembly.activeAssembly()
-        if not assembly:
-            return
-        view = Gui.activeDocument().activeView()
-
-        self.panel = TaskAssemblyCreateJoint(assembly, view, 2)
-        Gui.Control.showDialog(self.panel)
+        jointCmdActivated(2)
 
 
 class CommandCreateJointSlider:
@@ -143,10 +149,12 @@ class CommandCreateJointSlider:
             "Pixmap": "Assembly_CreateJointSlider",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointSlider", "Create Slider Joint"),
             "Accel": "S",
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "ToolTip": "<p>"
+            + QT_TRANSLATE_NOOP(
                 "Assembly_CreateJointSlider",
-                "<p>Create a Slider Joint: Allows linear movement along a single axis but restricts rotation between selected parts.</p>",
-            ),
+                "Create a Slider Joint: Allows linear movement along a single axis but restricts rotation between selected parts.",
+            )
+            + "</p>",
             "CmdType": "ForEdit",
         }
 
@@ -154,13 +162,7 @@ class CommandCreateJointSlider:
         return UtilsAssembly.activeAssembly() is not None
 
     def Activated(self):
-        assembly = UtilsAssembly.activeAssembly()
-        if not assembly:
-            return
-        view = Gui.activeDocument().activeView()
-
-        self.panel = TaskAssemblyCreateJoint(assembly, view, 3)
-        Gui.Control.showDialog(self.panel)
+        jointCmdActivated(3)
 
 
 class CommandCreateJointBall:
@@ -173,10 +175,12 @@ class CommandCreateJointBall:
             "Pixmap": "Assembly_CreateJointBall",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointBall", "Create Ball Joint"),
             "Accel": "B",
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "ToolTip": "<p>"
+            + QT_TRANSLATE_NOOP(
                 "Assembly_CreateJointBall",
-                "<p>Create a Ball Joint: Connects parts at a point, allowing unrestricted movement as long as the connection points remain in contact.</p>",
-            ),
+                "Create a Ball Joint: Connects parts at a point, allowing unrestricted movement as long as the connection points remain in contact.",
+            )
+            + "</p>",
             "CmdType": "ForEdit",
         }
 
@@ -184,13 +188,7 @@ class CommandCreateJointBall:
         return UtilsAssembly.activeAssembly() is not None
 
     def Activated(self):
-        assembly = UtilsAssembly.activeAssembly()
-        if not assembly:
-            return
-        view = Gui.activeDocument().activeView()
-
-        self.panel = TaskAssemblyCreateJoint(assembly, view, 4)
-        Gui.Control.showDialog(self.panel)
+        jointCmdActivated(4)
 
 
 class CommandCreateJointPlanar:
@@ -203,10 +201,12 @@ class CommandCreateJointPlanar:
             "Pixmap": "Assembly_CreateJointPlanar",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointPlanar", "Create Planar Joint"),
             "Accel": "P",
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "ToolTip": "<p>"
+            + QT_TRANSLATE_NOOP(
                 "Assembly_CreateJointPlanar",
-                "<p>Create a Planar Joint: Ensures two selected features are in the same plane, restricting movement to that plane.</p>",
-            ),
+                "Create a Planar Joint: Ensures two selected features are in the same plane, restricting movement to that plane.",
+            )
+            + "</p>",
             "CmdType": "ForEdit",
         }
 
@@ -214,13 +214,7 @@ class CommandCreateJointPlanar:
         return UtilsAssembly.activeAssembly() is not None
 
     def Activated(self):
-        assembly = UtilsAssembly.activeAssembly()
-        if not assembly:
-            return
-        view = Gui.activeDocument().activeView()
-
-        self.panel = TaskAssemblyCreateJoint(assembly, view, 5)
-        Gui.Control.showDialog(self.panel)
+        jointCmdActivated(5)
 
 
 class CommandCreateJointParallel:
@@ -233,10 +227,12 @@ class CommandCreateJointParallel:
             "Pixmap": "Assembly_CreateJointParallel",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointParallel", "Create Parallel Joint"),
             "Accel": "L",
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "ToolTip": "<p>"
+            + QT_TRANSLATE_NOOP(
                 "Assembly_CreateJointParallel",
-                "<p>Create a Parallel Joint: Aligns two features to be parallel, constraining relative movement to parallel translations.</p>",
-            ),
+                "Create a Parallel Joint: Aligns two features to be parallel, constraining relative movement to parallel translations.",
+            )
+            + "</p>",
             "CmdType": "ForEdit",
         }
 
@@ -244,13 +240,7 @@ class CommandCreateJointParallel:
         return UtilsAssembly.activeAssembly() is not None
 
     def Activated(self):
-        assembly = UtilsAssembly.activeAssembly()
-        if not assembly:
-            return
-        view = Gui.activeDocument().activeView()
-
-        self.panel = TaskAssemblyCreateJoint(assembly, view, 6)
-        Gui.Control.showDialog(self.panel)
+        jointCmdActivated(6)
 
 
 class CommandCreateJointTangent:
@@ -263,10 +253,38 @@ class CommandCreateJointTangent:
             "Pixmap": "Assembly_CreateJointTangent",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointTangent", "Create Tangent Joint"),
             "Accel": "T",
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "ToolTip": "<p>"
+            + QT_TRANSLATE_NOOP(
                 "Assembly_CreateJointTangent",
-                "<p>Create a Tangent Joint: Forces two features to be tangent, restricting movement to smooth transitions along their contact surface.</p>",
-            ),
+                "Create a Tangent Joint: Forces two features to be tangent, restricting movement to smooth transitions along their contact surface.",
+            )
+            + "</p>",
+            "CmdType": "ForEdit",
+        }
+
+    def IsActive(self):
+        return UtilsAssembly.activeAssembly() is not None
+
+    def Activated(self):
+        jointCmdActivated(7)
+
+
+class CommandToggleGrounded:
+    def __init__(self):
+        pass
+
+    def GetResources(self):
+
+        return {
+            "Pixmap": "Assembly_ToggleGrounded",
+            "MenuText": QT_TRANSLATE_NOOP("Assembly_ToggleGrounded", "Toggle grounded"),
+            "Accel": "F",
+            "ToolTip": "<p>"
+            + QT_TRANSLATE_NOOP(
+                "Assembly_ToggleGrounded",
+                "Toggle the grounded state of a part. Grounding a part permanently locks its position in the assembly, preventing any movement or rotation. You need at least one grounded part per assembly.",
+            )
+            + "</p>",
             "CmdType": "ForEdit",
         }
 
@@ -277,10 +295,36 @@ class CommandCreateJointTangent:
         assembly = UtilsAssembly.activeAssembly()
         if not assembly:
             return
-        view = Gui.activeDocument().activeView()
 
-        self.panel = TaskAssemblyCreateJoint(assembly, view, 7)
-        Gui.Control.showDialog(self.panel)
+        joint_group = getJointGroup(assembly)
+
+        selection = Gui.Selection.getSelectionEx("*", 0)
+        if not selection:
+            return
+
+        App.setActiveTransaction("Toggle grounded")
+        for sel in selection:
+            # If you select 2 solids (bodies for example) within an assembly.
+            # There'll be a single sel but 2 SubElementNames.
+            for sub in sel.SubElementNames:
+
+                full_element_name = UtilsAssembly.getFullElementName(sel.ObjectName, sub)
+                obj = UtilsAssembly.getObject(full_element_name)
+
+                # Check if part is grounded and if so delete the joint.
+                for joint in joint_group.Group:
+                    if hasattr(joint, "ObjectToGround") and joint.ObjectToGround == obj:
+                        doc = App.ActiveDocument
+                        doc.removeObject(joint.Name)
+                        doc.recompute()
+                        return
+
+                # Create groundedJoint.
+                ground = joint_group.newObject("App::FeaturePython", "GroundedJoint")
+                JointObject.GroundedJoint(ground, obj)
+                JointObject.ViewProviderGroundedJoint(ground.ViewObject)
+        Gui.Selection.clearSelection()
+        App.closeActiveTransaction()
 
 
 class MakeJointSelGate:
@@ -327,6 +371,9 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
         self.form.jointType.addItems(JointObject.JointTypes)
         self.form.jointType.setCurrentIndex(jointTypeIndex)
+        self.form.jointType.currentIndexChanged.connect(self.onJointTypeChanged)
+
+        self.jointName = self.form.jointType.currentText().replace(" ", "")
 
         Gui.Selection.clearSelection()
         Gui.Selection.addSelectionGate(
@@ -340,7 +387,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.callbackMove = self.view.addEventCallback("SoLocation2Event", self.moveMouse)
         self.callbackKey = self.view.addEventCallback("SoKeyboardEvent", self.KeyboardEvent)
 
-        App.setActiveTransaction("Create joint")
+        App.setActiveTransaction("Create " + self.jointName + " Joint")
         self.createJointObject()
 
     def accept(self):
@@ -348,6 +395,9 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
             App.Console.PrintWarning("You need to select 2 elements from 2 separate parts.")
             return False
         self.deactivate()
+
+        self.assembly.solve()
+
         App.closeActiveTransaction()
         return True
 
@@ -369,14 +419,18 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
     def createJointObject(self):
         type_index = self.form.jointType.currentIndex()
 
-        joint_group = self.assembly.getObject("Joints")
+        joint_group = getJointGroup(self.assembly)
 
-        if not joint_group:
-            joint_group = self.assembly.newObject("App::DocumentObjectGroup", "Joints")
-
-        self.joint = joint_group.newObject("App::FeaturePython", "Joint")
+        self.joint = joint_group.newObject("App::FeaturePython", self.jointName)
         JointObject.Joint(self.joint, type_index)
         JointObject.ViewProviderJoint(self.joint.ViewObject, self.joint)
+
+    def onJointTypeChanged(self, index):
+        App.closeActiveTransaction(True)
+        self.jointName = self.form.jointType.currentText().replace(" ", "")
+        App.setActiveTransaction("Create " + self.jointName + " Joint")
+        self.createJointObject()
+        self.updateJoint()
 
     def updateJoint(self):
         # First we build the listwidget
@@ -495,6 +549,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
 
 if App.GuiUp:
+    Gui.addCommand("Assembly_ToggleGrounded", CommandToggleGrounded())
     Gui.addCommand("Assembly_CreateJointFixed", CommandCreateJointFixed())
     Gui.addCommand("Assembly_CreateJointRevolute", CommandCreateJointRevolute())
     Gui.addCommand("Assembly_CreateJointCylindrical", CommandCreateJointCylindrical())
