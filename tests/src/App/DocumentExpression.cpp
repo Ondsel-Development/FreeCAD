@@ -20,7 +20,7 @@ protected:
 
     void SetUp() override
     {
-        _docName = App::GetApplication().getUniqueDocumentName("test");
+        _docName = App::GetApplication().getUniqueDocumentName("testDoc");
         _doc = App::GetApplication().newDocument(_docName.c_str(), "testUser");
         _sids = &_sid;
         _hasher = Base::Reference<App::StringHasher>(new App::StringHasher);
@@ -78,11 +78,26 @@ TEST_F(DocumentExpression, documentPropertiesBinding) // NOLINT
     auto* box = dynamic_cast<Part::Box*>(_doc->getObject("Box"));
     box->Label.setValue("Cube");
     box->execute();
-    // >>> Set custom document property to 4, call it "box_length"
+    // >>> Set custom property called "box_length" to 4.0
+    auto boxLengthProperty = static_cast<App::PropertyFloat*>(
+        _doc->addDynamicProperty("App::PropertyFloat", "box_length")
+    );
+    boxLengthProperty->setValue(4.0);
 
     // Act
+    std::shared_ptr<App::Expression> expression(App::Expression::parse(box, "testDoc$box_length"));
+    box->setExpression(
+        App::ObjectIdentifier::parse(box, "Length"),
+        expression
+    );
+    _doc->recompute();
 
     // Assert
-    auto length = box->Length.getValue();
-    EXPECT_EQ(length, 4.0);
+    EXPECT_EQ(expression->toString(), "box_length");
+    auto docBoxLengthProp = static_cast<App::PropertyFloat*>(
+        _doc->getPropertyByName("box_length")
+    );
+    EXPECT_EQ(docBoxLengthProp->getValue(), 4.0);
+    auto actualBoxLength = box->Length.getValue();
+    EXPECT_EQ(actualBoxLength, 4.0);
 }
