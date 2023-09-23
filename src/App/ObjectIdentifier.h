@@ -273,6 +273,7 @@ public:
         documentNameSet = other.documentNameSet;
         documentObjectNameSet = other.documentObjectNameSet;
         localProperty = other.localProperty;
+        documentProperty = other.documentProperty;
         _cache = std::move(other._cache);
         _hash = other._hash;
         return *this;
@@ -295,6 +296,7 @@ public:
     }
 
     std::string getPropertyName() const;
+    void identifyAsDocumentProperty(bool documentPropertyValue);
 
     template<typename C>
     void addComponents(const C &cs) { components.insert(components.end(), cs.begin(), cs.end()); }
@@ -340,6 +342,7 @@ public:
     bool hasDocumentObjectName(bool forced=false) const;
 
     bool isLocalProperty() const { return localProperty; }
+    bool isDocumentProperty() const { return documentProperty; }
 
     String getDocumentObjectName() const;
 
@@ -491,9 +494,11 @@ protected:
     bool documentNameSet;
     bool documentObjectNameSet;
     bool localProperty;
+    bool documentProperty; // aka "is this a property connected to a document rather than
+                           // a documentObject"
 
 private:
-    std::string _cache; // Cached string represstation of this identifier
+    std::string _cache; // Cached string representation of this identifier
     std::size_t _hash; // Cached hash of this string
 };
 

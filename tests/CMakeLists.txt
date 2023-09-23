@@ -65,7 +65,8 @@ function(setup_qt_test)
     endforeach ()
 endfunction()
 
-add_executable(Tests_run)
+add_executable(Tests_run
+        src/App/ExpressionParser.cpp)
 add_executable(Mesh_tests_run)
 add_executable(Part_tests_run)
 add_executable(Points_tests_run)

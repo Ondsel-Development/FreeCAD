@@ -54,9 +54,9 @@ TEST_F(DocumentExpression, spreadsheetBinding) // NOLINT
     auto* spreadsheet = dynamic_cast<Spreadsheet::Sheet*>(_doc->getObject("Spreadsheet"));
     spreadsheet->setCell("A1", "4");
     _doc->recompute();
-    std::shared_ptr<App::Expression> expression(App::Expression::parse(box, "Spreadsheet.A1"));
 
     // Act
+    std::shared_ptr<App::Expression> expression(App::Expression::parse(box, "Spreadsheet.A1"));
     box->setExpression(
         boxLengthOid,
         expression
@@ -82,14 +82,14 @@ TEST_F(DocumentExpression, documentPropertiesBinding) // NOLINT
     box->Label.setValue("Cube");
     box->execute();
     auto boxLengthOid = App::ObjectIdentifier::parse(box, "Length");
-    // >>> Set custom property called "box_length" to 4.0
+    // >>> Set custom property to current document called "box_length"; set to 4.0
     auto boxLengthProperty = static_cast<App::PropertyFloat*>(
         _doc->addDynamicProperty("App::PropertyFloat", "box_length")
     );
     boxLengthProperty->setValue(4.0);
-    std::shared_ptr<App::Expression> expression(App::Expression::parse(box, "testDoc$box_length"));
 
     // Act
+    std::shared_ptr<App::Expression> expression(App::Expression::parse(box, "#box_length"));
     box->setExpression(
         boxLengthOid,
         expression
@@ -98,7 +98,7 @@ TEST_F(DocumentExpression, documentPropertiesBinding) // NOLINT
 
     // Assert
     auto expressionDetailOnBox = box->getExpression(boxLengthOid).expression.get()->toString();
-    EXPECT_EQ(expressionDetailOnBox, "box_length");
+    EXPECT_EQ(expressionDetailOnBox, "#box_length");
     auto docBoxLengthProp = static_cast<App::PropertyFloat*>(
         _doc->getPropertyByName("box_length")
     );

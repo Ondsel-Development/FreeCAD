@@ -114,6 +114,7 @@ ObjectIdentifier::ObjectIdentifier(const App::PropertyContainer * _owner,
     , documentNameSet(false)
     , documentObjectNameSet(false)
     , localProperty(false)
+    , documentProperty(false)
     , _hash(0)
 {
     if (_owner) {
@@ -138,6 +139,7 @@ ObjectIdentifier::ObjectIdentifier(const App::PropertyContainer * _owner, bool l
     , documentNameSet(false)
     , documentObjectNameSet(false)
     , localProperty(localProperty)
+    , documentProperty(false)
     , _hash(0)
 {
     if (_owner) {
@@ -158,6 +160,7 @@ ObjectIdentifier::ObjectIdentifier(const Property &prop, int index)
     , documentNameSet(false)
     , documentObjectNameSet(false)
     , localProperty(false)
+    , documentProperty(false)
     , _hash(0)
 {
     DocumentObject * docObj = freecad_dynamic_cast<DocumentObject>(prop.getContainer());
@@ -340,7 +343,10 @@ const std::string &ObjectIdentifier::toString() const
     if(result.propertyIndex >= (int)components.size())
         return _cache;
 
-    if(localProperty ||
+    if (documentProperty)
+    {
+        s << '#';
+    } else if (localProperty ||
        (result.resolvedProperty &&
         result.resolvedDocumentObject==owner &&
         components.size()>1 &&
@@ -371,18 +377,22 @@ const std::string &ObjectIdentifier::toString() const
     return _cache;
 }
 
-std::string ObjectIdentifier::toPersistentString() const {
+std::string ObjectIdentifier::toPersistentString() const
+{
 
-    if(!owner)
+    if (!owner)
         return {};
 
     std::ostringstream s;
     ResolveResults result(*this);
 
-    if(result.propertyIndex >= (int)components.size())
+    if (result.propertyIndex >= (int)components.size())
         return {};
 
-    if(localProperty ||
+    if (documentProperty)
+    {
+        s << '#';
+    }else if(localProperty ||
        (result.resolvedProperty &&
         result.resolvedDocumentObject==owner &&
         components.size()>1 &&
@@ -927,6 +937,20 @@ void ObjectIdentifier::resolve(ResolveResults &results) const
 
     results.resolvedDocumentName = String(results.resolvedDocument->getName(), false, true);
 
+    if (documentProperty) {
+        // for when the document itself is being pointed to (not a documentObject)
+        if (documentName.getString().empty()) {  // for "#propName" expression, grab the current doc
+            results.resolvedDocument = owner->getDocument();
+            results.resolvedDocumentName = String(results.resolvedDocument->getName(), false, true);
+            results.propertyIndex = 0;
+            results.propertyName = components[results.propertyIndex].name.getString();
+        } else {
+            // TODO: handle named "other documents"
+        }
+        results.getProperty(*this);
+        return;
+    }
+
     /* Document object name specified? */
     if (!documentObjectName.getString().empty()) {
         results.resolvedDocumentObjectName = documentObjectName;
@@ -1378,6 +1402,17 @@ void ObjectIdentifier::setDocumentName(ObjectIdentifier::String &&name, bool for
         }
     }
     documentName = std::move(name);
+}
+
+/**
+ * @brief Set the object identifier to be a documentProperty.
+ *
+ * @param name Name of document object.
+ */
+
+void ObjectIdentifier::identifyAsDocumentProperty(bool documentPropertyValue)
+{
+    documentProperty = documentPropertyValue;
 }
 
 /**
@@ -2006,7 +2041,14 @@ std::string ObjectIdentifier::ResolveResults::resolveErrorString() const
 }
 
 void ObjectIdentifier::ResolveResults::getProperty(const ObjectIdentifier &oi) {
-    resolvedProperty = oi.resolveProperty(
-            resolvedDocumentObject,propertyName.c_str(),resolvedSubObject,propertyType);
+    if (oi.documentProperty) {
+        resolvedProperty = this->resolvedDocument->getPropertyByName(this->propertyName.c_str());
+    } else {
+        resolvedProperty = oi.resolveProperty(
+            resolvedDocumentObject,propertyName.c_str(),
+            resolvedSubObject,
+            propertyType
+        );
+    }
 }
 

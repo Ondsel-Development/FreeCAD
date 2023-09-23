@@ -42,13 +42,30 @@ TEST(Expression, tokenizeDocumentProperty)
     std::vector<std::tuple<int, int, std::string>> result =
         App::ExpressionParser::tokenize(srcString);
 
-    int i = 4;
-
     // Assert
     EXPECT_EQ(result.size(), expectedTokens.size());
     EXPECT_EQ(result[0], expectedTokens[0]);
     EXPECT_EQ(result[1], expectedTokens[1]);
     EXPECT_EQ(result[2], expectedTokens[2]);
+}
+
+TEST(Expression, tokenizeCurrentDocumentProperty)
+{
+    // Arrange
+    std::vector<std::tuple<int, int, std::string>> expectedTokens{
+        { 35, 0, "#" },
+        { App::ExpressionParser::IDENTIFIER, 1, "myProp" }
+    };
+    std::basic_string<char> srcString("#myProp");
+
+    // Act
+    std::vector<std::tuple<int, int, std::string>> result =
+        App::ExpressionParser::tokenize(srcString);
+
+    // Assert
+    EXPECT_EQ(result.size(), expectedTokens.size());
+    EXPECT_EQ(result[0], expectedTokens[0]);
+    EXPECT_EQ(result[1], expectedTokens[1]);
 }
 
 TEST(Expression, toString)

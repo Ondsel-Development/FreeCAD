@@ -186,18 +186,17 @@ iden
                                                 $$.addComponent(ObjectIdentifier::SimpleComponent($3));
                                                 $$.resolveAmbiguity();
                                             }
+    | '#' id_or_cell                        { /* Path to property from the current document */
+                                                $$ = ObjectIdentifier(DocumentObject);
+                                                $$.identifyAsDocumentProperty(true);
+                                                $$.addComponent(ObjectIdentifier::SimpleComponent($2));
+                                                $$.resolveAmbiguity();
+                                            }
     | document '#' object '.' id_or_cell    { /* Path to property from an external document, within a named document object */
                                                 $$ = ObjectIdentifier(DocumentObject);
                                                 $$.setDocumentName(std::move($1), true);
                                                 $$.setDocumentObjectName(std::move($3), true);
                                                 $$.addComponent(ObjectIdentifier::SimpleComponent($5));
-                                                $$.resolveAmbiguity();
-                                            }
-    | document '$' IDENTIFIER
-                                            {   $$ = ObjectIdentifier(DocumentObject);
-                                                $$.setDocumentName(std::move($1), true);
-                                                printf("test");
-                                                $$.addComponent(ObjectIdentifier::SimpleComponent($3));
                                                 $$.resolveAmbiguity();
                                             }
     | document '#' object '.' STRING '.' id_or_cell

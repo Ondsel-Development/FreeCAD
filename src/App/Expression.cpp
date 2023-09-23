@@ -1111,6 +1111,9 @@ App::any Expression::getValueAsAny() const {
     return pyObjectToAny(getPyValue());
 }
 
+// Note: despite the name "getPyValue"; this is not always called indirectly by Python;
+// nor does it call invoke python to get a value. It simply get's values with a python-like
+// getter and returns the values in a python-safe container (Py::Object).
 Py::Object Expression::getPyValue() const {
     try {
         Py::Object pyobj = _getPyValue();

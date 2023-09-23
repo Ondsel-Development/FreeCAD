@@ -6,6 +6,7 @@ target_sources(
             ${CMAKE_CURRENT_SOURCE_DIR}/ComplexGeoData.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/DocumentExpression.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/Expression.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/ExpressionParser.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/ElementMap.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/IndexedName.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/License.cpp
