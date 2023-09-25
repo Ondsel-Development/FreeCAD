@@ -830,6 +830,7 @@ enum ResolveFlags {
     ResolveByIdentifier,
     ResolveByLabel,
     ResolveAmbiguous,
+    ResolveAsDocumentProperty,
 };
 
 /**
@@ -939,13 +940,13 @@ void ObjectIdentifier::resolve(ResolveResults &results) const
 
     if (documentProperty) {
         // for when the document itself is being pointed to (not a documentObject)
+        results.flags.set(ResolveAsDocumentProperty);
         if (documentName.getString().empty()) {  // for "#propName" expression, grab the current doc
             results.resolvedDocument = owner->getDocument();
             results.resolvedDocumentName = String(results.resolvedDocument->getName(), false, true);
             results.propertyIndex = 0;
             results.propertyName = components[results.propertyIndex].name.getString();
-        } else {
-            // TODO: handle named "other documents"
+            results.propertyType = 7; // aka PseudoPropertyType::PseudoApp;
         }
         results.getProperty(*this);
         return;
@@ -1562,11 +1563,18 @@ void ObjectIdentifier::String::checkImport(const App::DocumentObject *owner,
 Py::Object ObjectIdentifier::access(const ResolveResults &result,
         Py::Object *value, Dependencies *deps) const
 {
-    if(!result.resolvedDocumentObject || !result.resolvedProperty ||
-       (!subObjectName.getString().empty() && !result.resolvedSubObject))
-    {
-        FC_THROWM(Base::RuntimeError, result.resolveErrorString()
-           << " in '" << toString() << "'");
+    if (result.flags.test(ResolveAsDocumentProperty)) {
+        if (!result.resolvedDocument || result.resolvedDocumentName.getString().empty() ||
+            !result.resolvedProperty) {
+            FC_THROWM(Base::RuntimeError, "unresolved Document Property in '" << toString() << "'");
+        }
+    } else {
+        if(!result.resolvedDocumentObject || !result.resolvedProperty ||
+            (!subObjectName.getString().empty() && !result.resolvedSubObject))
+        {
+            FC_THROWM(Base::RuntimeError, result.resolveErrorString()
+                          << " in '" << toString() << "'");
+        }
     }
 
     Py::Object pyobj;
@@ -1736,6 +1744,12 @@ Py::Object ObjectIdentifier::access(const ResolveResults &result,
         return;
     };
 
+    if (result.flags.test(ResolveAsDocumentProperty)) {
+        const char *attr = result.propertyName.c_str();
+        auto prop = result.resolvedDocument->getPropertyByName(attr);
+        auto pyProp = Py::asObject(prop->getPyObject());
+        return pyProp;
+    };
     App::DocumentObject *lastObj = result.resolvedDocumentObject;
     if(result.resolvedSubObject) {
         setPropDep(lastObj,nullptr,nullptr);

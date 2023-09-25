@@ -1,4 +1,3 @@
-#include "App/ElementMap.h"
 #include "Mod/Part/App/FeaturePartBox.h"
 #include "Mod/Spreadsheet/App/Sheet.h"
 #include "gtest/gtest.h"
@@ -22,22 +21,22 @@ protected:
     {
         _docName = App::GetApplication().getUniqueDocumentName("testDoc");
         _doc = App::GetApplication().newDocument(_docName.c_str(), "testUser");
-        _sids = &_sid;
-        _hasher = Base::Reference<App::StringHasher>(new App::StringHasher);
+        _otherDocName = App::GetApplication().getUniqueDocumentName("otherDoc");
+        _otherDoc = App::GetApplication().newDocument(_otherDocName.c_str(), "otherUser");
     }
 
     void TearDown() override
     {
         App::GetApplication().closeDocument(_docName.c_str());
+        App::GetApplication().closeDocument(_otherDocName.c_str());
     }
 
     App::Document* _doc;
+    App::Document* _otherDoc;
 
 private:
     std::string _docName;
-    Data::ElementIDRefs _sid;
-    QVector<App::StringIDRef>* _sids;
-    App::StringHasherRef _hasher;
+    std::string _otherDocName;
 };
 
 TEST_F(DocumentExpression, spreadsheetBinding) // NOLINT
@@ -73,7 +72,36 @@ TEST_F(DocumentExpression, spreadsheetBinding) // NOLINT
     EXPECT_EQ(length, 4.0);
 }
 
-TEST_F(DocumentExpression, documentPropertiesBinding) // NOLINT
+// this does not work yet as it appears to expect an external file, not simply a second document
+// on the same application.
+//TEST_F(DocumentExpression, externalDocumentPropertiesBinding) // NOLINT
+//{
+//    // Arrange
+//    // >>> Add a box named "Cube1" to main doc with default length of 10.0
+//    _doc->addObject("Part::Box", "Cube1");
+//    auto* box = dynamic_cast<Part::Box*>(_doc->getObject("Cube1"));
+//    box->execute();
+//    auto boxLengthOid = App::ObjectIdentifier::parse(box, "Length");
+//    // >>> Add a box named "Cube2" to "otherDoc" that has a Length of 4.0
+//    _otherDoc->addObject("Part::Box", "Cube2");
+//    auto* otherBox = dynamic_cast<Part::Box*>(_otherDoc->getObject("Cube2"));
+//    otherBox->Length.setValue(4.0);
+//    otherBox->execute();
+//
+//    // Act
+//    std::shared_ptr<App::Expression> expression(App::Expression::parse(box, "otherDoc#Cube2.Length"));
+//    box->setExpression(
+//        boxLengthOid,
+//        expression
+//    );
+//    _doc->recompute();
+//
+//    // Assert
+//    auto actualBoxLength = box->Length.getValue();
+//    EXPECT_EQ(actualBoxLength, 4.0);
+//}
+
+TEST_F(DocumentExpression, currentDocumentPropertiesBinding) // NOLINT
 {
     // Arrange
     // >>> Add a box named "Cube"

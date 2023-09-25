@@ -500,6 +500,8 @@ protected:
 private:
     std::string _cache; // Cached string representation of this identifier
     std::size_t _hash; // Cached hash of this string
+    Py::Object
+    accessByDocument(const ResolveResults& result, Py::Object* value, Dependencies* deps) const;
 };
 
 inline std::size_t hash_value(const App::ObjectIdentifier & path) {

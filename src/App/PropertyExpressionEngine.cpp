@@ -689,13 +689,11 @@ DocumentObjectExecReturn *App::PropertyExpressionEngine::execute(ExecuteOption o
                 // In the future, we can generalize the optimization to all
                 // property modification, i.e. do not touch unless value change
                 //
-                // if (option == ExecuteOnRestore && prop->testStatus(Property::EvalOnRestore))
-                {
-                    if (isAnyEqual(value, prop->getPathValue(*it)))
-                        continue;
-                    if (touched)
-                        *touched = true;
-                }
+                auto pathValue = prop->getPathValue(*it);
+                if (isAnyEqual(value, pathValue))
+                    continue;
+                if (touched)
+                    *touched = true;
                 prop->setPathValue(*it, value);
             }
         }catch(Base::Exception &e) {
