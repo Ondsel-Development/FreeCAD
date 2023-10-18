@@ -126,7 +126,8 @@ bool AssemblyObject::fixGroundedParts()
                 App::DocumentObject* objToGround = propObj->getValue();
 
                 Base::Placement plc = getPlacementFromProp(obj, "Placement");
-                fixGroundedPart(objToGround, plc, obj->getFullName());
+                std::string str = obj->getFullName();
+                fixGroundedPart(objToGround, plc, str);
                 onePartFixed = true;
             }
         }
@@ -294,7 +295,8 @@ std::shared_ptr<ASMTPart> AssemblyObject::getMbDPart(App::DocumentObject* obj)
     }
     else {
         // obj has not been associated with an ASMTPart before
-        mbdPart = makeMbdPart(obj->getFullName(), plc);
+        std::string str = obj->getFullName();
+        mbdPart = makeMbdPart(str, plc);
         mbdAssembly->addPart(mbdPart);
         objectPartMap[obj] = mbdPart;  // Store the association
     }
