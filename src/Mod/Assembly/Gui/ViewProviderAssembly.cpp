@@ -51,9 +51,9 @@ using namespace AssemblyGui;
 PROPERTY_SOURCE(AssemblyGui::ViewProviderAssembly, Gui::ViewProviderPart)
 
 ViewProviderAssembly::ViewProviderAssembly()
-    : canStartDragging(false)
+    : SelectionObserver(true)
+    , canStartDragging(false)
     , partMoving(false)
-    , numberOfSel(0)
     , prevMousePosition(Base::Vector3d(0., 0., 0.))
     , docsToMove({})
 {}
@@ -141,12 +141,6 @@ bool ViewProviderAssembly::mouseMove(const SbVec2s& cursorPos, Gui::View3DInvent
     if (canStartDragging) {
         canStartDragging = false;
 
-        if (numberOfSel != Gui::Selection().getSelectionEx().size()) {
-            // This means the user released the click but the event was missed
-            // because of selection.
-            return false;
-        }
-
         if (getSelectedObjectsWithinAssembly()) {
             SbVec3f vec = viewer->getPointOnFocalPlane(cursorPos);
             prevMousePosition = Base::Vector3d(vec[0], vec[1], vec[2]);
@@ -188,12 +182,11 @@ bool ViewProviderAssembly::mouseButtonPressed(int Button,
     if (Button == 1) {
         if (pressed) {
             canStartDragging = true;
-
-            // release event is not received when user click on a part for selection.
-            // So we use this work around to know if something got selected.
-            numberOfSel = Gui::Selection().getSelectionEx().size();
         }
         else {  // Button 1 released
+            // release event is not received when user click on a part for selection.
+            // So we use SelectionObserver to know if something got selected.
+
             canStartDragging = false;
             if (partMoving) {
                 endMove();
@@ -227,16 +220,22 @@ bool ViewProviderAssembly::getSelectedObjectsWithinAssembly()
     for (auto& selObj : Gui::Selection().getSelectionEx("",
                                                         App::DocumentObject::getClassTypeId(),
                                                         Gui::ResolveMode::NoResolve)) {
-        std::vector<std::string> subNames = selObj.getSubNames();
+        // getSubNames() returns ["Body001.Pad.Face14", "Body002.Pad.Face7"]
+        //  if you have several objects within the same assembly selected.
 
-        App::DocumentObject* obj = getObjectFromSubNames(subNames);
-        if (!obj) {
-            continue;
-        }
+        std::vector<std::string> objsSubNames = selObj.getSubNames();
+        for (auto& subNamesStr : objsSubNames) {
+            std::vector<std::string> subNames = parseSubNames(subNamesStr);
 
-        // Check if the selected object is a child of the assembly
-        if (assemblyPart->hasObject(obj, true)) {
-            docsToMove.push_back(obj);
+            App::DocumentObject* obj = getObjectFromSubNames(subNames);
+            if (!obj) {
+                continue;
+            }
+
+            // Check if the selected object is a child of the assembly
+            if (assemblyPart->hasObject(obj, true)) {
+                docsToMove.push_back(obj);
+            }
         }
     }
 
@@ -244,14 +243,11 @@ bool ViewProviderAssembly::getSelectedObjectsWithinAssembly()
     // it is not selected at that point. So we need to get the preselection too.
     if (Gui::Selection().hasPreselection()) {
 
-        Base::Console().Warning("Gui::Selection().getPreselection().pSubName %s\n",
-                                Gui::Selection().getPreselection().pSubName);
-        std::vector<std::string> subNames;
-        std::string subName;
-        std::istringstream subNameStream(Gui::Selection().getPreselection().pSubName);
-        while (std::getline(subNameStream, subName, '.')) {
-            subNames.push_back(subName);
-        }
+        // Base::Console().Warning("Gui::Selection().getPreselection().pSubName %s\n",
+        //                         Gui::Selection().getPreselection().pSubName);
+
+        std::string subNamesStr = Gui::Selection().getPreselection().pSubName;
+        std::vector<std::string> subNames = parseSubNames(subNamesStr);
 
         App::DocumentObject* preselectedObj = getObjectFromSubNames(subNames);
         if (preselectedObj) {
@@ -272,6 +268,17 @@ bool ViewProviderAssembly::getSelectedObjectsWithinAssembly()
     }
 
     return !docsToMove.empty();
+}
+
+std::vector<std::string> ViewProviderAssembly::parseSubNames(std::string& subNamesStr)
+{
+    std::vector<std::string> subNames;
+    std::string subName;
+    std::istringstream subNameStream(subNamesStr);
+    while (std::getline(subNameStream, subName, '.')) {
+        subNames.push_back(subName);
+    }
+    return subNames;
 }
 
 App::DocumentObject* ViewProviderAssembly::getObjectFromSubNames(std::vector<std::string>& subNames)
@@ -341,5 +348,15 @@ void ViewProviderAssembly::endMove()
         Gui::View3DInventorViewer* viewerNotConst;
         viewerNotConst = static_cast<Gui::View3DInventor*>(view)->getViewer();
         viewerNotConst->setSelectionEnabled(true);
+    }
+}
+
+
+void ViewProviderAssembly::onSelectionChanged(const Gui::SelectionChanges& msg)
+{
+    if (msg.Type == Gui::SelectionChanges::AddSelection
+        || msg.Type == Gui::SelectionChanges::ClrSelection
+        || msg.Type == Gui::SelectionChanges::RmvSelection) {
+        canStartDragging = false;
     }
 }

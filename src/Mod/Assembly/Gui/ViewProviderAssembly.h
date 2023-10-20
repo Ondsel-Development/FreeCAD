@@ -26,6 +26,7 @@
 
 #include <Mod/Assembly/AssemblyGlobal.h>
 
+#include <Gui/Selection.h>
 #include <Gui/ViewProviderPart.h>
 
 namespace Gui
@@ -36,7 +37,8 @@ class View3DInventorViewer;
 namespace AssemblyGui
 {
 
-class AssemblyGuiExport ViewProviderAssembly: public Gui::ViewProviderPart
+class AssemblyGuiExport ViewProviderAssembly: public Gui::ViewProviderPart,
+                                              public Gui::SelectionObserver
 {
     PROPERTY_HEADER_WITH_OVERRIDE(AssemblyGui::ViewProviderAssembly);
 
@@ -70,10 +72,13 @@ public:
 
     bool getSelectedObjectsWithinAssembly();
     App::DocumentObject* getObjectFromSubNames(std::vector<std::string>& subNames);
+    std::vector<std::string> parseSubNames(std::string& subNamesStr);
 
     // protected:
     /// get called by the container whenever a property has been changed
     // void onChanged(const App::Property* prop) override;
+
+    void onSelectionChanged(const Gui::SelectionChanges& msg) override;
 
     bool canStartDragging;
     bool partMoving;

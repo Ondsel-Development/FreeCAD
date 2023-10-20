@@ -433,7 +433,6 @@ void AssemblyObject::setNewPlacements()
 
 void AssemblyObject::recomputeJointPlacements(std::vector<App::DocumentObject*> joints)
 {
-    Base::Console().Warning("recomputeJointPlacements\n");
     // The Placement1 and Placement2 of each joint needs to be updated as the parts moved.
     for (auto* joint : joints) {
 
@@ -453,9 +452,7 @@ void AssemblyObject::recomputeJointPlacements(std::vector<App::DocumentObject*> 
 
         Py::Object attr = jointPy.getAttr("updateJCSPlacements");
         if (attr.ptr() && attr.isCallable()) {
-            Base::Console().Warning("recomputeJointPlacements i 6\n");
             Py::Callable(attr).apply();
-            Base::Console().Warning("recomputeJointPlacements i 7\n");
         }
     }
 }

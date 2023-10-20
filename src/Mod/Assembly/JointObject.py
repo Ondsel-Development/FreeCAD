@@ -26,6 +26,7 @@ import math
 import FreeCAD as App
 import Part
 
+from PySide import QtCore
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
 if App.GuiUp:
@@ -140,6 +141,10 @@ class Joint:
     def __setstate__(self, state):
         if state:
             self.Type = state
+
+    def setJointType(self, joint, jointType):
+        joint.JointType = jointType
+        joint.Label = jointType.replace(" ", "")
 
     def onChanged(self, fp, prop):
         """Do something when a property has changed"""
@@ -263,7 +268,7 @@ class Joint:
 
 
 class ViewProviderJoint:
-    def __init__(self, obj, app_obj):
+    def __init__(self, vobj):
         """Set this object to the proxy object of the actual view provider"""
         self.axis_thickness = 3
 
@@ -283,8 +288,8 @@ class ViewProviderJoint:
         self.cameraSensor = coin.SoFieldSensor(self.camera_callback, camera)
         self.cameraSensor.attach(camera.height)
 
-        self.app_obj = app_obj
-        obj.Proxy = self
+        self.app_obj = vobj.Object
+        vobj.Proxy = self
 
     def attach(self, obj):
         """Setup the scene sub-graph of the view provider, this method is mandatory"""
@@ -449,21 +454,21 @@ class ViewProviderJoint:
             self.x_axis_so_color.rgb.setValue(c[0], c[1], c[2])
 
     def getIcon(self):
-        if self.app_obj.getPropertyByName("JointType") == "Fixed":
+        if self.app_obj.JointType == "Fixed":
             return ":/icons/Assembly_CreateJointFixed.svg"
-        elif self.app_obj.getPropertyByName("JointType") == "Revolute":
+        elif self.app_obj.JointType == "Revolute":
             return ":/icons/Assembly_CreateJointRevolute.svg"
-        elif self.app_obj.getPropertyByName("JointType") == "Cylindrical":
+        elif self.app_obj.JointType == "Cylindrical":
             return ":/icons/Assembly_CreateJointCylindrical.svg"
-        elif self.app_obj.getPropertyByName("JointType") == "Slider":
+        elif self.app_obj.JointType == "Slider":
             return ":/icons/Assembly_CreateJointSlider.svg"
-        elif self.app_obj.getPropertyByName("JointType") == "Ball":
+        elif self.app_obj.JointType == "Ball":
             return ":/icons/Assembly_CreateJointBall.svg"
-        elif self.app_obj.getPropertyByName("JointType") == "Planar":
+        elif self.app_obj.JointType == "Planar":
             return ":/icons/Assembly_CreateJointPlanar.svg"
-        elif self.app_obj.getPropertyByName("JointType") == "Parallel":
+        elif self.app_obj.JointType == "Parallel":
             return ":/icons/Assembly_CreateJointParallel.svg"
-        elif self.app_obj.getPropertyByName("JointType") == "Tangent":
+        elif self.app_obj.JointType == "Tangent":
             return ":/icons/Assembly_CreateJointTangent.svg"
 
         return ":/icons/Assembly_CreateJoint.svg"
@@ -478,6 +483,10 @@ class ViewProviderJoint:
         """When restoring the serialized object from document we have the chance to set some internals here.\
                 Since no data were serialized nothing needs to be done here."""
         return None
+
+    def doubleClicked(self, vobj):
+        panel = TaskAssemblyCreateJoint(0, vobj.Object)
+        Gui.Control.showDialog(panel)
 
 
 ################ Grounded Joint object #################
@@ -558,3 +567,285 @@ class ViewProviderGroundedJoint:
 
     def getIcon(self):
         return ":/icons/Assembly_ToggleGrounded.svg"
+
+
+class MakeJointSelGate:
+    def __init__(self, taskbox, assembly):
+        self.taskbox = taskbox
+        self.assembly = assembly
+
+    def allow(self, doc, obj, sub):
+        if not sub:
+            return False
+
+        objs_names, element_name = UtilsAssembly.getObjsNamesAndElement(obj.Name, sub)
+
+        if self.assembly.Name not in objs_names or element_name == "":
+            # Only objects within the assembly. And not whole objects, only elements.
+            return False
+
+        if Gui.Selection.isSelected(obj, sub, Gui.Selection.ResolveMode.NoResolve):
+            # If it's to deselect then it's ok
+            return True
+
+        if len(self.taskbox.current_selection) >= 2:
+            # No more than 2 elements can be selected for basic joints.
+            return False
+
+        full_obj_name = ".".join(objs_names)
+        full_element_name = full_obj_name + "." + element_name
+        selected_object = UtilsAssembly.getObject(full_element_name)
+
+        for selection_dict in self.taskbox.current_selection:
+            if selection_dict["object"] == selected_object:
+                # Can't join a solid to itself. So the user need to select 2 different parts.
+                return False
+
+        return True
+
+
+class TaskAssemblyCreateJoint(QtCore.QObject):
+    def __init__(self, jointTypeIndex, jointObj=None):
+        super().__init__()
+
+        self.assembly = UtilsAssembly.activeAssembly()
+        self.view = Gui.activeDocument().activeView()
+        self.doc = App.ActiveDocument
+
+        if not self.assembly or not self.view or not self.doc:
+            return
+
+        self.form = Gui.PySideUic.loadUi(":/panels/TaskAssemblyCreateJoint.ui")
+
+        self.form.jointType.addItems(JointTypes)
+        self.form.jointType.setCurrentIndex(jointTypeIndex)
+        self.form.jointType.currentIndexChanged.connect(self.onJointTypeChanged)
+
+        Gui.Selection.clearSelection()
+
+        if jointObj:
+            self.joint = jointObj
+            self.jointName = jointObj.Label
+            App.setActiveTransaction("Edit " + self.jointName + " Joint")
+
+            self.updateTaskboxFromJoint()
+
+        else:
+            self.jointName = self.form.jointType.currentText().replace(" ", "")
+            App.setActiveTransaction("Create " + self.jointName + " Joint")
+
+            self.current_selection = []
+            self.preselection_dict = None
+
+            self.createJointObject()
+
+        Gui.Selection.addSelectionGate(
+            MakeJointSelGate(self, self.assembly), Gui.Selection.ResolveMode.NoResolve
+        )
+        Gui.Selection.addObserver(self, Gui.Selection.ResolveMode.NoResolve)
+        Gui.Selection.setSelectionStyle(Gui.Selection.SelectionStyle.GreedySelection)
+
+        self.callbackMove = self.view.addEventCallback("SoLocation2Event", self.moveMouse)
+        self.callbackKey = self.view.addEventCallback("SoKeyboardEvent", self.KeyboardEvent)
+
+    def accept(self):
+        if len(self.current_selection) != 2:
+            App.Console.PrintWarning("You need to select 2 elements from 2 separate parts.")
+            return False
+
+        # Hide JSC's when joint is created and enable selection highlighting
+        # self.joint.ViewObject.Visibility = False
+        # self.joint.ViewObject.OnTopWhenSelected = "Enabled"
+
+        self.deactivate()
+
+        self.assembly.solve()
+
+        App.closeActiveTransaction()
+        return True
+
+    def reject(self):
+        self.deactivate()
+        App.closeActiveTransaction(True)
+        return True
+
+    def deactivate(self):
+        Gui.Selection.removeSelectionGate()
+        Gui.Selection.removeObserver(self)
+        Gui.Selection.setSelectionStyle(Gui.Selection.SelectionStyle.NormalSelection)
+        Gui.Selection.clearSelection()
+        self.view.removeEventCallback("SoLocation2Event", self.callbackMove)
+        self.view.removeEventCallback("SoKeyboardEvent", self.callbackKey)
+        if Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+
+    def createJointObject(self):
+        type_index = self.form.jointType.currentIndex()
+
+        joint_group = UtilsAssembly.getJointGroup(self.assembly)
+
+        self.joint = joint_group.newObject("App::FeaturePython", self.jointName)
+        Joint(self.joint, type_index)
+        ViewProviderJoint(self.joint.ViewObject)
+
+    def onJointTypeChanged(self, index):
+        self.joint.Proxy.setJointType(self.joint, self.form.jointType.currentText())
+
+    def updateTaskboxFromJoint(self):
+        self.current_selection = []
+        self.preselection_dict = None
+
+        selection_dict1 = {
+            "object": self.joint.Object1,
+            "element_name": self.joint.Element1,
+            "vertex_name": self.joint.Vertex1,
+        }
+
+        selection_dict2 = {
+            "object": self.joint.Object2,
+            "element_name": self.joint.Element2,
+            "vertex_name": self.joint.Vertex2,
+        }
+
+        self.current_selection.append(selection_dict1)
+        self.current_selection.append(selection_dict2)
+
+        elName = self.getObjSubNameFromObj(self.joint.Object1, self.joint.Element1)
+        Gui.Selection.addSelection(self.doc.Name, self.joint.Object1.Label, elName)
+        print(
+            f"Gui.Selection.addSelection('{self.doc.Name}', '{self.joint.Object1.Label}', '{elName}')"
+        )
+
+        elName = self.getObjSubNameFromObj(self.joint.Object2, self.joint.Element2)
+        Gui.Selection.addSelection(self.doc.Name, self.joint.Object2.Label, elName)
+
+        self.updateJointList()
+
+    def getObjSubNameFromObj(self, obj, elName):
+        if obj.TypeId == "PartDesign::Body":
+            return obj.Tip.Name + "." + elName
+        elif obj.TypeId == "App::Link":
+            linked_obj = obj.getLinkedObject()
+            if linked_obj.TypeId == "PartDesign::Body":
+                return linked_obj.Tip.Name + "." + elName
+        else:
+            return elName
+
+    def updateJoint(self):
+        # First we build the listwidget
+        self.updateJointList()
+
+        # Then we pass the new list to the join object
+        self.joint.Proxy.setJointConnectors(self.current_selection)
+
+    def updateJointList(self):
+        self.form.featureList.clear()
+        simplified_names = []
+        for sel in self.current_selection:
+            # TODO: ideally we probably want to hide the feature name in case of PartDesign bodies. ie body.face12 and not body.pad2.face12
+            sname = sel["object"].Label + "." + sel["element_name"]
+            simplified_names.append(sname)
+        self.form.featureList.addItems(simplified_names)
+
+    def moveMouse(self, info):
+        if len(self.current_selection) >= 2 or (
+            len(self.current_selection) == 1
+            and self.current_selection[0]["object"] == self.preselection_dict["object"]
+        ):
+            self.joint.ViewObject.Proxy.showPreviewJCS(False)
+            return
+
+        cursor_pos = self.view.getCursorPos()
+        cursor_info = self.view.getObjectInfo(cursor_pos)
+        # cursor_info example  {'x': 41.515, 'y': 7.449, 'z': 16.861, 'ParentObject': <Part object>, 'SubName': 'Body002.Pad.Face5', 'Document': 'part3', 'Object': 'Pad', 'Component': 'Face5'}
+
+        if (
+            not cursor_info
+            or not self.preselection_dict
+            or cursor_info["SubName"] != self.preselection_dict["sub_name"]
+        ):
+            self.joint.ViewObject.Proxy.showPreviewJCS(False)
+            return
+
+        # newPos = self.view.getPoint(*info["Position"]) # This is not what we want, it's not pos on the object but on the focal plane
+
+        newPos = App.Vector(cursor_info["x"], cursor_info["y"], cursor_info["z"])
+        self.preselection_dict["mouse_pos"] = newPos
+
+        self.preselection_dict["vertex_name"] = UtilsAssembly.findElementClosestVertex(
+            self.preselection_dict
+        )
+
+        placement = self.joint.Proxy.findPlacement(
+            self.preselection_dict["object"],
+            self.preselection_dict["element_name"],
+            self.preselection_dict["vertex_name"],
+        )
+        self.joint.ViewObject.Proxy.showPreviewJCS(True, placement)
+        self.previewJCSVisible = True
+
+    # 3D view keyboard handler
+    def KeyboardEvent(self, info):
+        if info["State"] == "UP" and info["Key"] == "ESCAPE":
+            self.reject()
+
+        if info["State"] == "UP" and info["Key"] == "RETURN":
+            self.accept()
+
+    # selectionObserver stuff
+    def addSelection(self, doc_name, obj_name, sub_name, mousePos):
+        full_obj_name = UtilsAssembly.getFullObjName(obj_name, sub_name)
+        full_element_name = UtilsAssembly.getFullElementName(obj_name, sub_name)
+        selected_object = UtilsAssembly.getObject(full_element_name)
+        element_name = UtilsAssembly.getElementName(full_element_name)
+
+        selection_dict = {
+            "object": selected_object,
+            "element_name": element_name,
+            "full_element_name": full_element_name,
+            "full_obj_name": full_obj_name,
+            "mouse_pos": App.Vector(mousePos[0], mousePos[1], mousePos[2]),
+        }
+        selection_dict["vertex_name"] = UtilsAssembly.findElementClosestVertex(selection_dict)
+
+        self.current_selection.append(selection_dict)
+        self.updateJoint()
+
+    def removeSelection(self, doc_name, obj_name, sub_name, mousePos=None):
+        full_element_name = UtilsAssembly.getFullElementName(obj_name, sub_name)
+        selected_object = UtilsAssembly.getObject(full_element_name)
+        element_name = UtilsAssembly.getElementName(full_element_name)
+
+        # Find and remove the corresponding dictionary from the combined list
+        selection_dict_to_remove = None
+        for selection_dict in self.current_selection:
+            if selection_dict["object"] == selected_object:
+                selection_dict_to_remove = selection_dict
+                break
+
+        if selection_dict_to_remove is not None:
+            self.current_selection.remove(selection_dict_to_remove)
+
+        self.updateJoint()
+
+    def setPreselection(self, doc_name, obj_name, sub_name):
+        if not sub_name:
+            self.preselection_dict = None
+            return
+
+        full_obj_name = UtilsAssembly.getFullObjName(obj_name, sub_name)
+        full_element_name = UtilsAssembly.getFullElementName(obj_name, sub_name)
+        selected_object = UtilsAssembly.getObject(full_element_name)
+        element_name = UtilsAssembly.getElementName(full_element_name)
+
+        self.preselection_dict = {
+            "object": selected_object,
+            "sub_name": sub_name,
+            "element_name": element_name,
+            "full_element_name": full_element_name,
+            "full_obj_name": full_obj_name,
+        }
+
+    def clearSelection(self, doc_name):
+        self.current_selection.clear()
+        self.updateJoint()
