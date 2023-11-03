@@ -50,6 +50,7 @@
 #include "Utils.h"
 #include "ViewProviderSketch.h"
 
+#include "DrawSketchHandlerTranslate.h"
 #include "DrawSketchHandlerOffset.h"
 #include "DrawSketchHandlerRotate.h"
 #include "DrawSketchHandlerScale.h"
@@ -2482,6 +2483,84 @@ bool CmdSketcherScale::isActive()
     return isCommandActive(getActiveGuiDocument(), true);
 }
 
+// Translate / rectangular pattern tool =======================================================
+
+DEF_STD_CMD_A(CmdSketcherTranslate)
+
+CmdSketcherTranslate::CmdSketcherTranslate()
+    : Command("Sketcher_Translate")
+{
+    sAppModule = "Sketcher";
+    sGroup = "Sketcher";
+    sMenuText = QT_TR_NOOP("Translate geometries");
+    sToolTipText = QT_TR_NOOP("Translate selected geometries n times, enable creation of rectangular patterns.");
+    sWhatsThis = "Sketcher_Translate";
+    sStatusTip = sToolTipText;
+    sPixmap = "Sketcher_Translate";
+    sAccel = "W";
+    eType = ForEdit;
+}
+
+void CmdSketcherTranslate::activated(int iMsg)
+{
+    Q_UNUSED(iMsg);
+    std::vector<int> listOfGeoIds = {};
+
+    // get the selection
+    std::vector<Gui::SelectionObject> selection;
+    selection = getSelection().getSelectionEx(0, Sketcher::SketchObject::getClassTypeId());
+
+    // only one sketch with its subelements are allowed to be selected
+    if (selection.size() != 1) {
+        QMessageBox::warning(Gui::getMainWindow(),
+            QObject::tr("Wrong selection"),
+            QObject::tr("Select elements from a single sketch."));
+        return;
+    }
+
+    // get the needed lists and objects
+    auto* Obj = static_cast<Sketcher::SketchObject*>(selection[0].getObject());
+    const std::vector<std::string>& subNames = selection[0].getSubNames();
+    if (!subNames.empty()) {
+
+        for (auto& name : subNames) {
+            // only handle non-external edges
+            if (name.size() > 4 && name.substr(0, 4) == "Edge") {
+                int geoId = std::atoi(name.substr(4, 4000).c_str()) - 1;
+                if (geoId >= 0) {
+                    listOfGeoIds.push_back(geoId);
+                }
+            }
+            else if (name.size() > 6 && name.substr(0, 6) == "Vertex") {
+                // only if it is a GeomPoint
+                int VtId = std::atoi(name.substr(6, 4000).c_str()) - 1;
+                int geoId;
+                Sketcher::PointPos PosId;
+                Obj->getGeoVertexIndex(VtId, geoId, PosId);
+                if (isPoint(*Obj->getGeometry(geoId))) {
+                    if (geoId >= 0) {
+                        listOfGeoIds.push_back(geoId);
+                    }
+                }
+            }
+        }
+    }
+
+    if (listOfGeoIds.size() != 0) {
+        ActivateHandler(getActiveGuiDocument(), new DrawSketchHandlerTranslate(listOfGeoIds));
+    }
+    else {
+        getSelection().clearSelection();
+        Gui::NotifyUserError(Obj,
+            QT_TRANSLATE_NOOP("Notifications", "Invalid selection"),
+            QT_TRANSLATE_NOOP("Notifications", "Selection has no valid geometries."));
+    }
+}
+
+bool CmdSketcherTranslate::isActive()
+{
+    return isCommandActive(getActiveGuiDocument(), true);
+}
 
 void CreateSketcherCommandsConstraintAccel()
 {
@@ -2498,6 +2577,7 @@ void CreateSketcherCommandsConstraintAccel()
     rcCmdMgr.addCommand(new CmdSketcherSelectElementsAssociatedWithConstraints());
     rcCmdMgr.addCommand(new CmdSketcherSelectElementsWithDoFs());
     rcCmdMgr.addCommand(new CmdSketcherRestoreInternalAlignmentGeometry());
+    rcCmdMgr.addCommand(new CmdSketcherTranslate());
     rcCmdMgr.addCommand(new CmdSketcherOffset());
     rcCmdMgr.addCommand(new CmdSketcherRotate());
     rcCmdMgr.addCommand(new CmdSketcherScale());
