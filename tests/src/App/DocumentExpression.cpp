@@ -20,21 +20,38 @@ protected:
 
     void SetUp() override
     {
-        _docName = App::GetApplication().getUniqueDocumentName("testDoc");
-        _doc = App::GetApplication().newDocument(_docName.c_str(), "testUser");
+        // >> create two Documents: "a" and "b"
+        _aDocName = App::GetApplication().getUniqueDocumentName("a");
+        _aDoc = App::GetApplication().newDocument(_aDocName.c_str(), "testUser");
+        _bDocName = App::GetApplication().getUniqueDocumentName("b");
+        _bDoc = App::GetApplication().newDocument(_bDocName.c_str(), "testUser");
         _sids = &_sid;
         _hasher = Base::Reference<App::StringHasher>(new App::StringHasher);
+        // >>> On doc "a", set a property called "d" to 4.0
+        auto boxLengthProperty = static_cast<App::PropertyFloat*>(
+            _aDoc->addDynamicProperty("App::PropertyFloat", "d")
+        );
+        boxLengthProperty->setValue(4.0);
+        // >>> Add a cube named "k"
+        _aDoc->addObject("Part::Box", "Box");
+        _kCube = dynamic_cast<Part::Box*>(_aDoc->getObject("Box"));
+        _kCube->Label.setValue("k");
+        _kCube->execute();
     }
 
     void TearDown() override
     {
-        App::GetApplication().closeDocument(_docName.c_str());
+        App::GetApplication().closeDocument(_aDocName.c_str());
+        App::GetApplication().closeDocument(_bDocName.c_str());
     }
 
-    App::Document* _doc;
+    std::string _aDocName;
+    App::Document* _aDoc;
+    std::string _bDocName;
+    App::Document* _bDoc;
+    Part::Box* _kCube;
 
 private:
-    std::string _docName;
     Data::ElementIDRefs _sid;
     QVector<App::StringIDRef>* _sids;
     App::StringHasherRef _hasher;
@@ -42,91 +59,69 @@ private:
 
 // In summary, the class will test the following combinations work:
 
-//    $a#b.c  = from doc a, get object b's property c
-//    $a.d    = from doc a, get document-property d
-
-//    $#b.c = from current doc, get object b's property c
-//    $.d   = from current doc, get document-property d
-
-//    #b.c  = from current doc, get object b's property c
-//    b.c   = from current doc, get object b's property c
-//    #.c   = from current doc, from current object, get property c
-//    .c    = from current doc, from current object, get property c (legacy behavior)
-
-// An "object" can be of many types; this test library will use Spreadsheets for that.
-// So, a spreadsheet called joe in the current doc, cell A1 could be reached as:
-//      $#joe.A1
-//      #joe.A1
-//      joe.A1
-//      .A1   (but only if the "joe" was already the current object.)
+//    $a#k.Width  = from doc a, get object k's property Width
+//    $a.d        = from doc a, get document-property d
+//    $#k.Width   = from current doc, get object k's property x
+//    $.d         = from current doc, get document-property d
+//    #k.Width    = from current doc, get object k's property Width
+//    k.Width     = from current doc, get object b's property c
+//    #.Width     = from current doc, from current object, get property c
+//    .Width      = from current doc, from current object, get property c (legacy behavior)
 
 // It will also test that the following combinations will NOT work:
 
-//    #b    = this is an object in the current doc, what should be returned?
+//    #u    = this is an object in the current doc, what should be returned?
 //    $a    = this is doc a, what should be returned?
 //    $     = this is the current doc, what should be returned?
 //    #     = this is the current object on the current doc, what should be returned?
-//    #$.x  = out of order; makes no sense
+//    #$.i  = out of order; makes no sense
 //    $.#   = out of order; makes no sense
 
+// binding cube k's length to expression: Spreadsheet.A1
 TEST_F(DocumentExpression, spreadsheetBinding) // NOLINT
 {
     // Arrange
-    // >>> Add a box named "Cube"
-    _doc->addObject("Part::Box", "Box");
-    auto* box = dynamic_cast<Part::Box*>(_doc->getObject("Box"));
-    box->Label.setValue("Cube");
-    box->execute();
     // >>> Add spreadsheet and set A1 to 4
-    _doc->addObject("Spreadsheet::Sheet", "Spreadsheet");
-    auto* spreadsheet = dynamic_cast<Spreadsheet::Sheet*>(_doc->getObject("Spreadsheet"));
+    _aDoc->addObject("Spreadsheet::Sheet", "Spreadsheet");
+    auto* spreadsheet = dynamic_cast<Spreadsheet::Sheet*>(_aDoc->getObject("Spreadsheet"));
     spreadsheet->setCell("A1", "4");
-    _doc->recompute();
+    _bDoc->recompute();
 
     // Act
-    std::shared_ptr<App::Expression> expression(App::Expression::parse(box, "Spreadsheet.A1"));
-    box->setExpression(
-        App::ObjectIdentifier::parse(box, "Length"),
+    std::shared_ptr<App::Expression> expression(App::Expression::parse(_kCube, "Spreadsheet.A1"));
+    _kCube->setExpression(
+        App::ObjectIdentifier::parse(_kCube, "Length"),
         expression
     );
-    _doc->recompute();
+    _aDoc->recompute();
 
     // Assert
     std::string a1Content;
     spreadsheet->getCell(App::stringToAddress("A1"))->getStringContent(a1Content);
     EXPECT_EQ(a1Content, "4");
-    auto length = box->Length.getValue();
+    auto length = _kCube->Length.getValue();
     EXPECT_EQ(length, 4.0);
 }
 
-TEST_F(DocumentExpression, documentPropertiesBinding) // NOLINT
+// binding cube k's Length to expression: $a.d
+TEST_F(DocumentExpression, documentPropertiesBinding_dol_a_dot_d) // NOLINT
 {
-    // Arrange
-    // >>> Add a box named "Cube"
-    _doc->addObject("Part::Box", "Box");
-    auto* box = dynamic_cast<Part::Box*>(_doc->getObject("Box"));
-    box->Label.setValue("Cube");
-    box->execute();
-    // >>> Set custom property called "box_length" to 4.0
-    auto boxLengthProperty = static_cast<App::PropertyFloat*>(
-        _doc->addDynamicProperty("App::PropertyFloat", "box_length")
-    );
-    boxLengthProperty->setValue(4.0);
+    // Arrange (arranged in Setup)
 
     // Act
-    std::shared_ptr<App::Expression> expression(App::Expression::parse(box, "testDoc$box_length"));
-    box->setExpression(
-        App::ObjectIdentifier::parse(box, "Length"),
+    std::shared_ptr<App::Expression> expression(App::Expression::parse(_kCube, "$a.d"));
+    _kCube->setExpression(
+        App::ObjectIdentifier::parse(_kCube, "Length"),
         expression
     );
-    _doc->recompute();
+    _aDoc->recompute();
 
     // Assert
-    EXPECT_EQ(expression->toString(), "box_length");
+    EXPECT_EQ(expression->toString(), "d");
     auto docBoxLengthProp = static_cast<App::PropertyFloat*>(
-        _doc->getPropertyByName("box_length")
+        _aDoc->getPropertyByName("d")
     );
     EXPECT_EQ(docBoxLengthProp->getValue(), 4.0);
-    auto actualBoxLength = box->Length.getValue();
+    auto actualBoxLength = _kCube->Length.getValue();
     EXPECT_EQ(actualBoxLength, 4.0);
 }
