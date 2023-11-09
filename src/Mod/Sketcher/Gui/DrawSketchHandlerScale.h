@@ -24,11 +24,23 @@
 #ifndef SKETCHERGUI_DrawSketchHandlerScale_H
 #define SKETCHERGUI_DrawSketchHandlerScale_H
 
+#include <QApplication>
+
+#include <Gui/BitmapFactory.h>
+#include <Gui/Notifications.h>
+#include <Gui/Command.h>
+#include <Gui/CommandT.h>
+
+#include <Mod/Sketcher/App/GeometryFacade.h>
+#include <Mod/Sketcher/App/SketchObject.h>
+
 #include "DrawSketchDefaultWidgetController.h"
 #include "DrawSketchControllableHandler.h"
 
 #include "GeometryCreationMode.h"
 #include "Utils.h"
+
+using namespace Sketcher;
 
 namespace SketcherGui
 {
@@ -59,13 +71,21 @@ public:
     explicit DrawSketchHandlerScale(std::vector<int> listOfGeoIds)
         : listOfGeoIds(listOfGeoIds)
         , deleteOriginal(true)
+        , refLength(0.0)
+        , length(0.0)
+        , scaleFactor(0.0)
     {}
+
+    DrawSketchHandlerScale(const DrawSketchHandlerScale&) = delete;
+    DrawSketchHandlerScale(DrawSketchHandlerScale&&) = delete;
+    DrawSketchHandlerScale& operator=(const DrawSketchHandlerScale&) = delete;
+    DrawSketchHandlerScale& operator=(DrawSketchHandlerScale&&) = delete;
+
     ~DrawSketchHandlerScale() override = default;
 
 private:
     void updateDataAndDrawToPosition(Base::Vector2d onSketchPos) override
     {
-
         switch (state()) {
             case SelectMode::SeekFirst: {
                 referencePoint = onSketchPos;
@@ -76,13 +96,7 @@ private:
 
                 startPoint = onSketchPos;
 
-                if (refLength > Precision::Confusion()) {
-                    std::vector<Part::Geometry*> geometriesToAdd;
-                    auto* line = new Part::GeomLineSegment();
-                    line->setPoints(toVector3d(referencePoint), toVector3d(startPoint));
-                    geometriesToAdd.push_back(line);
-                    drawEdit(geometriesToAdd);
-                }
+                CreateAndDrawShapeGeometry();
             } break;
             case SelectMode::SeekThird: {
                 length = (onSketchPos - referencePoint).Length();
@@ -112,6 +126,7 @@ private:
             Gui::Command::commitCommand();
         }
         catch (const Base::Exception& e) {
+            e.ReportException();
             Gui::NotifyError(sketchgui,
                              QT_TRANSLATE_NOOP("Notifications", "Error"),
                              QT_TRANSLATE_NOOP("Notifications", "Failed to scale"));
@@ -166,6 +181,26 @@ private:
         continuousMode = false;
     }
 
+    bool canGoToNextMode() override
+    {
+        if (state() == SelectMode::SeekThird && scaleFactor < Precision::Confusion()) {
+            // Prevent validation zero scale.
+            return false;
+        }
+        return true;
+    }
+
+    void angleSnappingControl() override
+    {
+        if (state() == SelectMode::SeekSecond || state() == SelectMode::SeekThird) {
+            setAngleSnapping(true, referencePoint);
+        }
+
+        else {
+            setAngleSnapping(false);
+        }
+    }
+
 private:
     std::vector<int> listOfGeoIds;
     Base::Vector2d referencePoint, startPoint, endPoint;
@@ -191,70 +226,82 @@ private:
 
     void createShape(bool onlyeditoutline) override
     {
+        SketchObject* Obj = sketchgui->getSketchObject();
+
+        ShapeGeometry.clear();
+
+        if (state() == SelectMode::SeekSecond) {
+            if (refLength > Precision::Confusion()) {
+                addLineToShapeGeometry(toVector3d(referencePoint), toVector3d(startPoint), true);
+            }
+            return;
+        }
+
         if (fabs(scaleFactor) < Precision::Confusion()) {
             return;
         }
 
-        Sketcher::SketchObject* Obj = sketchgui->getSketchObject();
-
-        ShapeGeometry.clear();
-
         for (auto& geoId : listOfGeoIds) {
-            Part::Geometry* geo = Obj->getGeometry(geoId)->copy();
+            const Part::Geometry* pGeo = Obj->getGeometry(geoId);
+            auto geoUniquePtr = std::unique_ptr<Part::Geometry>(pGeo->copy());
+            Part::Geometry* geo = geoUniquePtr.get();
 
-            bool isConstructionGeo =
-                Sketcher::GeometryFacade::getConstruction(Obj->getGeometry(geoId));
-            Sketcher::GeometryFacade::setConstruction(geo, isConstructionGeo);
+            bool isConstructionGeo = GeometryFacade::getConstruction(pGeo);
+            GeometryFacade::setConstruction(geo, isConstructionGeo);
+            if (GeometryFacade::isInternalAligned(pGeo)) {
+                InternalType::InternalType type = GeometryFacade::getInternalType(pGeo);
+                GeometryFacade::setInternalType(geo, type);
+            }
 
             if (isCircle(*geo)) {
-                auto* circle = static_cast<Part::GeomCircle*>(geo);
+                auto* circle = static_cast<Part::GeomCircle*>(geo);  // NOLINT
                 circle->setRadius(circle->getRadius() * scaleFactor);
                 circle->setCenter(getScaledPoint(circle->getCenter(), referencePoint, scaleFactor));
             }
             else if (isArcOfCircle(*geo)) {
-                auto* arcOfCircle = static_cast<Part::GeomArcOfCircle*>(geo);
+                auto* arcOfCircle = static_cast<Part::GeomArcOfCircle*>(geo);  // NOLINT
                 arcOfCircle->setRadius(arcOfCircle->getRadius() * scaleFactor);
                 arcOfCircle->setCenter(
                     getScaledPoint(arcOfCircle->getCenter(), referencePoint, scaleFactor));
             }
             else if (isLineSegment(*geo)) {
-                auto* line = static_cast<Part::GeomLineSegment*>(geo);
+                auto* line = static_cast<Part::GeomLineSegment*>(geo);  // NOLINT
                 line->setPoints(getScaledPoint(line->getStartPoint(), referencePoint, scaleFactor),
                                 getScaledPoint(line->getEndPoint(), referencePoint, scaleFactor));
             }
             else if (isEllipse(*geo)) {
-                auto* ellipse = static_cast<Part::GeomEllipse*>(geo);
+                auto* ellipse = static_cast<Part::GeomEllipse*>(geo);  // NOLINT
                 ellipse->setMajorRadius(ellipse->getMajorRadius() * scaleFactor);
                 ellipse->setMinorRadius(ellipse->getMinorRadius() * scaleFactor);
                 ellipse->setCenter(
                     getScaledPoint(ellipse->getCenter(), referencePoint, scaleFactor));
             }
             else if (isArcOfEllipse(*geo)) {
-                auto* arcOfEllipse = static_cast<Part::GeomArcOfEllipse*>(geo);
+                auto* arcOfEllipse = static_cast<Part::GeomArcOfEllipse*>(geo);  // NOLINT
                 arcOfEllipse->setMajorRadius(arcOfEllipse->getMajorRadius() * scaleFactor);
                 arcOfEllipse->setMinorRadius(arcOfEllipse->getMinorRadius() * scaleFactor);
                 arcOfEllipse->setCenter(
                     getScaledPoint(arcOfEllipse->getCenter(), referencePoint, scaleFactor));
             }
             else if (isArcOfHyperbola(*geo)) {
-                auto* arcOfHyperbola = static_cast<Part::GeomArcOfHyperbola*>(geo);
+                auto* arcOfHyperbola = static_cast<Part::GeomArcOfHyperbola*>(geo);  // NOLINT
                 arcOfHyperbola->setMajorRadius(arcOfHyperbola->getMajorRadius() * scaleFactor);
                 arcOfHyperbola->setMinorRadius(arcOfHyperbola->getMinorRadius() * scaleFactor);
                 arcOfHyperbola->setCenter(
                     getScaledPoint(arcOfHyperbola->getCenter(), referencePoint, scaleFactor));
             }
             else if (isArcOfParabola(*geo)) {
-                auto* arcOfParabola = static_cast<Part::GeomArcOfParabola*>(geo);
+                auto* arcOfParabola = static_cast<Part::GeomArcOfParabola*>(geo);  // NOLINT
                 // TODO: Problem with scale parabola end points.
                 arcOfParabola->setFocal(arcOfParabola->getFocal() * scaleFactor);
                 arcOfParabola->setCenter(
                     getScaledPoint(arcOfParabola->getCenter(), referencePoint, scaleFactor));
             }
             else if (isBSplineCurve(*geo)) {
-                auto* bSpline = static_cast<Part::GeomBSplineCurve*>(geo);
+                auto* bSpline = static_cast<Part::GeomBSplineCurve*>(geo);  // NOLINT
                 std::vector<Base::Vector3d> poles = bSpline->getPoles();
                 for (size_t p = 0; p < poles.size(); p++) {
-                    poles[p] = getScaledPoint(poles[p], referencePoint, scaleFactor);
+                    poles[p] = getScaledPoint(std::move(poles[p]), referencePoint, scaleFactor);
                 }
                 bSpline->setPoles(poles);
             }
@@ -263,7 +310,7 @@ private:
                 point->setPoint(getScaledPoint(point->getPoint(), referencePoint, scaleFactor));
             }
 
-            ShapeGeometry.push_back(std::move(std::unique_ptr<Part::Geometry>(geo)));
+            ShapeGeometry.emplace_back(std::move(geoUniquePtr));
         }
 
         if (onlyeditoutline) {
@@ -274,23 +321,18 @@ private:
         }
         else {
             int firstCurveCreated = getHighestCurveIndex() + 1;
-            using namespace Sketcher;
 
             const std::vector<Constraint*>& vals = Obj->Constraints.getValues();
-            std::vector<int> geoIdsWhoAlreadyHasEqual =
-                {};  // avoid applying equal several times if cloning distanceX and distanceY of the
-                     // same part.
+            // avoid applying equal several times if cloning distanceX and distanceY of the
+            // same part.
+            std::vector<int> geoIdsWhoAlreadyHasEqual = {};
 
             for (auto& cstr : vals) {
                 int firstIndex = indexInVec(listOfGeoIds, cstr->First);
                 int secondIndex = indexInVec(listOfGeoIds, cstr->Second);
                 int thirdIndex = indexInVec(listOfGeoIds, cstr->Third);
 
-                auto newConstr = std::make_unique<Constraint>();
-                newConstr->Type = cstr->Type;
-                newConstr->FirstPos = cstr->FirstPos;
-                newConstr->SecondPos = cstr->SecondPos;
-                newConstr->ThirdPos = cstr->ThirdPos;
+                auto newConstr = std::unique_ptr<Constraint>(cstr->copy());
                 newConstr->First = firstCurveCreated + firstIndex;
 
                 if ((cstr->Type == Symmetric || cstr->Type == Tangent
@@ -302,7 +344,7 @@ private:
                 else if ((cstr->Type == Coincident || cstr->Type == Tangent
                           || cstr->Type == Symmetric || cstr->Type == Perpendicular
                           || cstr->Type == Parallel || cstr->Type == Equal
-                          || cstr->Type == PointOnObject)
+                          || cstr->Type == PointOnObject || cstr->Type == InternalAlignment)
                          && firstIndex >= 0 && secondIndex >= 0
                          && thirdIndex == GeoEnum::GeoUndef) {
                     newConstr->Second = firstCurveCreated + secondIndex;
@@ -329,21 +371,22 @@ private:
         }
     }
 
-    int indexInVec(std::vector<int> vec, int elem)
+    int indexInVec(const std::vector<int> vec, int elem) const
     {
-        if (elem == Sketcher::GeoEnum::GeoUndef) {
-            return Sketcher::GeoEnum::GeoUndef;
+        if (elem == GeoEnum::GeoUndef) {
+            return GeoEnum::GeoUndef;
         }
         for (size_t i = 0; i < vec.size(); i++) {
             if (vec[i] == elem) {
-                return i;
+                return static_cast<int>(i);
             }
         }
         return -1;
     }
 
-    Base::Vector3d
-    getScaledPoint(Base::Vector3d pointToScale, Base::Vector2d referencePoint, double scaleFactor)
+    Base::Vector3d getScaledPoint(Base::Vector3d&& pointToScale,
+                                  const Base::Vector2d& referencePoint,
+                                  double scaleFactor)
     {
         Base::Vector2d pointToScale2D;
         pointToScale2D.x = pointToScale.x;
@@ -384,6 +427,9 @@ void DSHScaleController::configureToolWidget()
 
     onViewParameters[OnViewParameter::First]->setLabelType(Gui::SoDatumLabel::DISTANCEX);
     onViewParameters[OnViewParameter::Second]->setLabelType(Gui::SoDatumLabel::DISTANCEY);
+    onViewParameters[OnViewParameter::Third]->setLabelType(
+        Gui::SoDatumLabel::DISTANCE,
+        Gui::EditableDatumLabel::Function::Dimensioning);
 }
 
 template<>
@@ -399,7 +445,6 @@ void DSHScaleController::adaptDrawingToCheckboxChange(int checkboxindex, bool va
 template<>
 void DSHScaleControllerBase::doEnforceControlParameters(Base::Vector2d& onSketchPos)
 {
-
     switch (handler->state()) {
         case SelectMode::SeekFirst: {
             if (onViewParameters[OnViewParameter::First]->isSet) {
@@ -413,6 +458,7 @@ void DSHScaleControllerBase::doEnforceControlParameters(Base::Vector2d& onSketch
         case SelectMode::SeekThird: {
             if (onViewParameters[OnViewParameter::Third]->isSet) {
                 double scaleFactor = onViewParameters[OnViewParameter::Third]->getValue();
+                handler->refLength = 1.0;
                 handler->startPoint = handler->referencePoint + Base::Vector2d(1.0, 0.0);
                 handler->endPoint = handler->referencePoint + Base::Vector2d(scaleFactor, 0.0);
 
@@ -430,11 +476,11 @@ void DSHScaleController::adaptParameters(Base::Vector2d onSketchPos)
     switch (handler->state()) {
         case SelectMode::SeekFirst: {
             if (!onViewParameters[OnViewParameter::First]->isSet) {
-                onViewParameters[OnViewParameter::First]->setSpinboxValue(onSketchPos.x);
+                setOnViewParameterValue(OnViewParameter::First, onSketchPos.x);
             }
 
             if (!onViewParameters[OnViewParameter::Second]->isSet) {
-                onViewParameters[OnViewParameter::Second]->setSpinboxValue(onSketchPos.y);
+                setOnViewParameterValue(OnViewParameter::Second, onSketchPos.y);
             }
 
             bool sameSign = onSketchPos.x * onSketchPos.y > 0.;
