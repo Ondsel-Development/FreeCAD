@@ -17,6 +17,10 @@
     #.Height    = from current doc, from current object, get property Height
     .Height     = from current doc, from current object, get property Height (legacy behavior)
 
+ All of the above tests will set cube "target"'s Length to the expression.
+ #target.Length's starting width is 10, and
+    $a.d's width is 4.0, #k.Width is 5.0, #target.Height is 7.0.
+
  It will also test that the following combinations will NOT work:
 
     #u    = this is an object in the current doc, what should be returned?
@@ -50,7 +54,7 @@ protected:
         _sids = &_sid;
         _hasher = Base::Reference<App::StringHasher>(new App::StringHasher);
         // >>> On doc "a", set a property called "d" to 4.0
-        auto boxLengthProperty = static_cast<App::PropertyFloat*>(
+        auto boxLengthProperty = dynamic_cast<App::PropertyFloat*>(
             _aDoc->addDynamicProperty("App::PropertyFloat", "d")
         );
         boxLengthProperty->setValue(4.0);
@@ -76,11 +80,11 @@ protected:
 
 protected:
     std::string _aDocName;
-    App::Document* _aDoc;
+    App::Document* _aDoc{};
     std::string _bDocName;
-    App::Document* _bDoc;
-    Part::Box* _targetCube;
-    Part::Box* _kCube;
+    App::Document* _bDoc{};
+    Part::Box* _targetCube{};
+    Part::Box* _kCube{};
 
 private:
     Data::ElementIDRefs _sid;
@@ -89,7 +93,7 @@ private:
 };
 
 
-// binding cube k's length to expression: Spreadsheet.A1
+// binding cube target's length to expression: Spreadsheet.A1
 TEST_F(DocumentExpression, spreadsheetBinding) // NOLINT
 {
     // Arrange
@@ -151,10 +155,6 @@ TEST_F(DocumentExpression, documentPropertiesBinding_dol_a_dot_d) // NOLINT
 
     // Assert
     EXPECT_EQ(expression->toString(), "$a.d");
-    auto docBoxLengthProp = dynamic_cast<App::PropertyFloat*>(
-        _aDoc->getPropertyByName("d")
-    );
-    EXPECT_EQ(docBoxLengthProp->getValue(), 4.0);
     auto actualBoxLength = _targetCube->Length.getValue();
     EXPECT_EQ(actualBoxLength, 4.0);
 }
@@ -195,10 +195,6 @@ TEST_F(DocumentExpression, documentPropertiesBinding_dol_dot_d) // NOLINT
 
     // Assert
     EXPECT_EQ(expression->toString(), "$.d");
-    auto docBoxLengthProp = dynamic_cast<App::PropertyFloat*>(
-        _aDoc->getPropertyByName("d")
-    );
-    EXPECT_EQ(docBoxLengthProp->getValue(), 4.0);
     auto actualBoxLength = _targetCube->Length.getValue();
     EXPECT_EQ(actualBoxLength, 4.0);
 }
