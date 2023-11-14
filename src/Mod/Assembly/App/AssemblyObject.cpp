@@ -146,7 +146,8 @@ void AssemblyObject::fixGroundedPart(App::DocumentObject* obj,
     std::shared_ptr<ASMTPart> mbdPart = getMbDPart(obj);
 
     std::string markerName2 = "FixingMarker";
-    auto mbdMarker2 = makeMbdMarker(markerName2, plc);
+    Base::Placement basePlc = Base::Placement();
+    auto mbdMarker2 = makeMbdMarker(markerName2, basePlc);
     mbdPart->addMarker(mbdMarker2);
 
     markerName1 = "/OndselAssembly/" + mbdMarker1->name;
