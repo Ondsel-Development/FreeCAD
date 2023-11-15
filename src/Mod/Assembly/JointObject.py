@@ -47,9 +47,13 @@ JointTypes = [
     QT_TRANSLATE_NOOP("AssemblyJoint", "Cylindrical"),
     QT_TRANSLATE_NOOP("AssemblyJoint", "Slider"),
     QT_TRANSLATE_NOOP("AssemblyJoint", "Ball"),
-    QT_TRANSLATE_NOOP("AssemblyJoint", "Planar"),
-    QT_TRANSLATE_NOOP("AssemblyJoint", "Parallel"),
-    QT_TRANSLATE_NOOP("AssemblyJoint", "Tangent"),
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Distance"),
+]
+
+JointUsingOffset = [
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Fixed"),
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Revolute"),
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Distance"),
 ]
 
 
@@ -132,6 +136,16 @@ class Joint:
             ),
         )
 
+        joint.addProperty(
+            "App::PropertyFloat",
+            "Offset",
+            "Joint",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "This is the offset of the joint.",
+            ),
+        )
+
         self.setJointConnectors(joint, [])
 
     def __getstate__(self):
@@ -179,6 +193,9 @@ class Joint:
             joint.Element2 = ""
             joint.Vertex2 = ""
             joint.Placement2 = UtilsAssembly.activeAssembly().Placement
+
+    def setJointOffset(self, joint, offset):
+        joint.Offset = offset
 
     def updateJCSPlacements(self, joint):
         joint.Placement1 = self.findPlacement(joint.Object1, joint.Element1, joint.Vertex1)
@@ -454,12 +471,8 @@ class ViewProviderJoint:
             return ":/icons/Assembly_CreateJointSlider.svg"
         elif self.app_obj.JointType == "Ball":
             return ":/icons/Assembly_CreateJointBall.svg"
-        elif self.app_obj.JointType == "Planar":
-            return ":/icons/Assembly_CreateJointPlanar.svg"
-        elif self.app_obj.JointType == "Parallel":
-            return ":/icons/Assembly_CreateJointParallel.svg"
-        elif self.app_obj.JointType == "Tangent":
-            return ":/icons/Assembly_CreateJointTangent.svg"
+        elif self.app_obj.JointType == "Distance":
+            return ":/icons/Assembly_CreateJointDistance.svg"
 
         return ":/icons/Assembly_CreateJoint.svg"
 
@@ -612,6 +625,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.form.jointType.addItems(JointTypes)
         self.form.jointType.setCurrentIndex(jointTypeIndex)
         self.form.jointType.currentIndexChanged.connect(self.onJointTypeChanged)
+        self.form.offsetSpinbox.valueChanged.connect(self.onOffsetChanged)
 
         Gui.Selection.clearSelection()
 
@@ -630,6 +644,8 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
             self.preselection_dict = None
 
             self.createJointObject()
+
+        self.toggleOffsetVisibility()
 
         Gui.Selection.addSelectionGate(
             MakeJointSelGate(self, self.assembly), Gui.Selection.ResolveMode.NoResolve
@@ -683,6 +699,18 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
     def onJointTypeChanged(self, index):
         self.joint.Proxy.setJointType(self.joint, self.form.jointType.currentText())
+        self.toggleOffsetVisibility()
+
+    def onOffsetChanged(self, quantity):
+        self.joint.Proxy.setJointOffset(self.joint, self.form.offsetSpinbox.property("rawValue"))
+
+    def toggleOffsetVisibility(self):
+        if self.form.jointType.currentText() in JointUsingOffset:
+            self.form.offsetLabel.show()
+            self.form.offsetSpinbox.show()
+        else:
+            self.form.offsetLabel.hide()
+            self.form.offsetSpinbox.hide()
 
     def updateTaskboxFromJoint(self):
         self.current_selection = []
@@ -712,6 +740,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         elName = self.getObjSubNameFromObj(self.joint.Object2, self.joint.Element2)
         Gui.Selection.addSelection(self.doc.Name, self.joint.Object2.Name, elName)
 
+        self.form.offsetSpinbox.setProperty("rawValue", self.joint.Offset)
         self.updateJointList()
 
     def getObjSubNameFromObj(self, obj, elName):

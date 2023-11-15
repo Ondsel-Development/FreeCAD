@@ -164,8 +164,14 @@ void AssemblyObject::fixGroundedPart(App::DocumentObject* obj,
 void AssemblyObject::jointParts(std::vector<App::DocumentObject*> joints)
 {
     for (auto* joint : joints) {
-        std::shared_ptr<ASMTJoint> mbdJoint = makeMbdJoint(joint);
-        mbdAssembly->addJoint(mbdJoint);
+        if (!joint) {
+            continue;
+        }
+
+        std::vector<std::shared_ptr<MbD::ASMTJoint>> mbdJoints = makeMbdJoint(joint);
+        for (auto& mbdJoint : mbdJoints) {
+            mbdAssembly->addJoint(mbdJoint);
+        }
     }
 }
 
@@ -251,41 +257,69 @@ std::shared_ptr<ASMTJoint> AssemblyObject::makeMbdJointOfType(JointType jointTyp
     else if (jointType == JointType::Ball) {
         mbdJoint = CREATE<ASMTSphericalJoint>::With();
     }
-    else if (jointType == JointType::Planar) {
-        mbdJoint = CREATE<ASMTPointInPlaneJoint>::With();
-    }
-    else if (jointType == JointType::Parallel) {
-        // TODO
-        mbdJoint = CREATE<ASMTFixedJoint>::With();
-    }
-    else if (jointType == JointType::Tangent) {
-        // TODO
-        mbdJoint = CREATE<ASMTFixedJoint>::With();
-    }
 
     return mbdJoint;
 }
 
-std::shared_ptr<ASMTJoint> AssemblyObject::makeMbdJoint(App::DocumentObject* joint)
+bool AssemblyObject::jointUseOffset(JointType jointType)
+{
+    return (jointType == JointType::Fixed || jointType == JointType::Revolute
+            || jointType == JointType::Distance);
+}
+
+std::vector<std::shared_ptr<MbD::ASMTJoint>>
+AssemblyObject::makeMbdJoint(App::DocumentObject* joint)
 {
     JointType jointType = JointType::Fixed;
 
-    auto* prop = joint
-        ? dynamic_cast<App::PropertyEnumeration*>(joint->getPropertyByName("JointType"))
-        : nullptr;
+    auto* prop = dynamic_cast<App::PropertyEnumeration*>(joint->getPropertyByName("JointType"));
     if (prop) {
         jointType = static_cast<JointType>(prop->getValue());
     }
 
+    if (jointType == JointType::Distance) {
+        return makeMbdDistanceJoint(joint);
+    }
+
     std::shared_ptr<ASMTJoint> mbdJoint = makeMbdJointOfType(jointType);
 
-    std::string fullMarkerName1 = handleOneSideOfJoint(joint, "Object1", "Placement1");
-    std::string fullMarkerName2 = handleOneSideOfJoint(joint, "Object2", "Placement2");
+
+    std::string fullMarkerName1 = handleOneSideOfJoint(joint, jointType, "Object1", "Placement1");
+    std::string fullMarkerName2 = handleOneSideOfJoint(joint, jointType, "Object2", "Placement2");
 
     mbdJoint->setMarkerI(fullMarkerName1);
     mbdJoint->setMarkerJ(fullMarkerName2);
 
-    return mbdJoint;
+    return {mbdJoint};
+}
+
+std::vector<std::shared_ptr<MbD::ASMTJoint>>
+AssemblyObject::makeMbdDistanceJoint(App::DocumentObject* joint)
+{
+    // Depending on the type of element of the JCS, we apply the correct set of constraints.
+    std::string type1 = getElementTypeFromProp(joint, "Element1");
+    std::string type2 = getElementTypeFromProp(joint, "Element2");
+
+    if (type1 == "Vertex" && type2 == "Vertex") {
+        // Point to point distance, or ball joint if offset=0.
+    }
+    else if (type1 == "Edge" && type2 == "Edge") {
+        // Line to line distance, or cylindricalJoint if offset=0. For arcs/others ?
+    }
+    else if (type1 == "Face" && type2 == "Face") {
+        // Co-planar (with offset if necessary) for planes. Tangent constraint for cylinder?
+    }
+    else if ((type1 == "Vertex" && type2 == "Face") || (type1 == "Face" && type2 == "Vertex")) {
+        // Point in plane joint if offset=0 and face=plane. Else?
+    }
+    else if ((type1 == "Edge" && type2 == "Face") || (type1 == "Face" && type2 == "Edge")) {
+        // Line in plane joint.
+    }
+    else if ((type1 == "Vertex" && type2 == "Edge") || (type1 == "Edge" && type2 == "Vertex")) {
+        // Make point on line joint.
+    }
+
+    return {};
 }
 
 std::shared_ptr<ASMTPart> AssemblyObject::getMbDPart(App::DocumentObject* obj)
@@ -311,14 +345,11 @@ std::shared_ptr<ASMTPart> AssemblyObject::getMbDPart(App::DocumentObject* obj)
 }
 
 std::string AssemblyObject::handleOneSideOfJoint(App::DocumentObject* joint,
+                                                 JointType jointType,
                                                  const char* propLinkName,
                                                  const char* propPlcName)
 {
-    auto* propObj = dynamic_cast<App::PropertyLink*>(joint->getPropertyByName(propLinkName));
-    if (!propObj) {
-        return nullptr;
-    }
-    App::DocumentObject* obj = propObj->getValue();
+    App::DocumentObject* obj = getLinkObjFromProp(joint, propLinkName);
 
     std::shared_ptr<ASMTPart> mbdPart = getMbDPart(obj);
     Base::Placement objPlc = getPlacementFromProp(obj, "Placement");
@@ -328,11 +359,43 @@ std::string AssemblyObject::handleOneSideOfJoint(App::DocumentObject* joint,
 
     plc = objPlc.inverse() * plc;
 
+    // Now we apply the offset if required.
+    if (propLinkName == "Object2" && jointUseOffset(jointType)) {
+        applyOffsetToPlacement(plc, joint);
+    }
+
     std::string markerName = joint->getFullName();
     auto mbdMarker = makeMbdMarker(markerName, plc);
     mbdPart->addMarker(mbdMarker);
 
     return "/OndselAssembly/" + mbdPart->name + "/" + markerName;
+}
+
+std::string AssemblyObject::getElementTypeFromProp(App::DocumentObject* obj, const char* propName)
+{
+    auto* prop = dynamic_cast<App::PropertyString*>(obj->getPropertyByName(propName));
+    if (!prop) {
+        return "";
+    }
+
+    // The prop is going to be something like 'Edge14' or 'Face7'. We need 'Edge' or 'Face'
+    std::string elementType;
+    for (char ch : std::string(prop->getValue())) {
+        if (std::isalpha(ch)) {
+            elementType += ch;
+        }
+    }
+    return elementType;
+}
+
+App::DocumentObject* AssemblyObject::getLinkObjFromProp(App::DocumentObject* joint,
+                                                        const char* propLinkName)
+{
+    auto* propObj = dynamic_cast<App::PropertyLink*>(joint->getPropertyByName(propLinkName));
+    if (!propObj) {
+        return nullptr;
+    }
+    return propObj->getValue();
 }
 
 std::shared_ptr<ASMTMarker> AssemblyObject::makeMbdMarker(std::string& name, Base::Placement& plc)
@@ -394,6 +457,25 @@ std::shared_ptr<ASMTAssembly> AssemblyObject::makeMbdAssembly()
     assembly->setName("OndselAssembly");
 
     return assembly;
+}
+
+void AssemblyObject::applyOffsetToPlacement(Base::Placement& plc, App::DocumentObject* joint)
+{
+    Base::Vector3d pos = plc.getPosition();
+    Base::Rotation rot = plc.getRotation();
+    double offset = 0.0;
+
+    auto* prop = dynamic_cast<App::PropertyFloat*>(joint->getPropertyByName("Offset"));
+    if (prop) {
+        offset = prop->getValue();
+    }
+    Base::Vector3d offsetVec = Base::Vector3d(0., 0., offset);
+
+    // OffsetVec needs to be relative to plc.
+    offsetVec = rot.multVec(offsetVec);
+
+    pos += offsetVec;
+    plc.setPosition(pos);
 }
 
 void AssemblyObject::setNewPlacements()

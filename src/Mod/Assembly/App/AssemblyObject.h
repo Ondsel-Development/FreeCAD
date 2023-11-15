@@ -57,9 +57,7 @@ enum class JointType
     Cylindrical,
     Slider,
     Ball,
-    Planar,
-    Parallel,
-    Tangent
+    Distance
 };
 
 class AssemblyExport AssemblyObject: public App::Part
@@ -85,16 +83,25 @@ public:
     makeMbdPart(std::string& name, Base::Placement plc = Base::Placement(), double mass = 1.0);
     std::shared_ptr<MbD::ASMTPart> getMbDPart(App::DocumentObject* obj);
     std::shared_ptr<MbD::ASMTMarker> makeMbdMarker(std::string& name, Base::Placement& plc);
-    std::shared_ptr<MbD::ASMTJoint> makeMbdJoint(App::DocumentObject* joint);
+    std::vector<std::shared_ptr<MbD::ASMTJoint>> makeMbdJoint(App::DocumentObject* joint);
+    std::vector<std::shared_ptr<MbD::ASMTJoint>> makeMbdDistanceJoint(App::DocumentObject* joint);
     std::shared_ptr<MbD::ASMTJoint> makeMbdJointOfType(JointType jointType);
+    bool jointUseOffset(JointType jointType);
     std::string handleOneSideOfJoint(App::DocumentObject* joint,
+                                     JointType jointType,
                                      const char* propObjLinkName,
                                      const char* propPlcName);
     void fixGroundedPart(App::DocumentObject* obj, Base::Placement& plc, std::string& jointName);
     bool fixGroundedParts();
     void jointParts(std::vector<App::DocumentObject*> joints);
     std::vector<App::DocumentObject*> getJoints();
+
+    // helper function to get objects from properties
+    std::string getElementTypeFromProp(App::DocumentObject* obj, const char* propName);
     Base::Placement getPlacementFromProp(App::DocumentObject* obj, const char* propName);
+    App::DocumentObject* getLinkObjFromProp(App::DocumentObject* joint, const char* propName);
+
+    void applyOffsetToPlacement(Base::Placement& plc, App::DocumentObject* joint);
     void setNewPlacements();
     void recomputeJointPlacements(std::vector<App::DocumentObject*> joints);
 
