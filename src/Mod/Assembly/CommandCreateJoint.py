@@ -179,20 +179,20 @@ class CommandCreateJointBall:
         Gui.Control.showDialog(panel)
 
 
-class CommandCreateJointPlanar:
+class CommandCreateJointDistance:
     def __init__(self):
         pass
 
     def GetResources(self):
 
         return {
-            "Pixmap": "Assembly_CreateJointPlanar",
-            "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointPlanar", "Create Planar Joint"),
-            "Accel": "P",
+            "Pixmap": "Assembly_CreateJointDistance",
+            "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointDistance", "Create Distance Joint"),
+            "Accel": "D",
             "ToolTip": "<p>"
             + QT_TRANSLATE_NOOP(
-                "Assembly_CreateJointPlanar",
-                "Create a Planar Joint: Ensures two selected features are in the same plane, restricting movement to that plane.",
+                "Assembly_CreateJointDistance",
+                "Create a Distance Joint: Depending on your selection this tool will apply different constraints.",
             )
             + "</p>",
             "CmdType": "ForEdit",
@@ -203,60 +203,6 @@ class CommandCreateJointPlanar:
 
     def Activated(self):
         panel = TaskAssemblyCreateJoint(5)
-        Gui.Control.showDialog(panel)
-
-
-class CommandCreateJointParallel:
-    def __init__(self):
-        pass
-
-    def GetResources(self):
-
-        return {
-            "Pixmap": "Assembly_CreateJointParallel",
-            "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointParallel", "Create Parallel Joint"),
-            "Accel": "L",
-            "ToolTip": "<p>"
-            + QT_TRANSLATE_NOOP(
-                "Assembly_CreateJointParallel",
-                "Create a Parallel Joint: Aligns two features to be parallel, constraining relative movement to parallel translations.",
-            )
-            + "</p>",
-            "CmdType": "ForEdit",
-        }
-
-    def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
-
-    def Activated(self):
-        panel = TaskAssemblyCreateJoint(6)
-        Gui.Control.showDialog(panel)
-
-
-class CommandCreateJointTangent:
-    def __init__(self):
-        pass
-
-    def GetResources(self):
-
-        return {
-            "Pixmap": "Assembly_CreateJointTangent",
-            "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointTangent", "Create Tangent Joint"),
-            "Accel": "T",
-            "ToolTip": "<p>"
-            + QT_TRANSLATE_NOOP(
-                "Assembly_CreateJointTangent",
-                "Create a Tangent Joint: Forces two features to be tangent, restricting movement to smooth transitions along their contact surface.",
-            )
-            + "</p>",
-            "CmdType": "ForEdit",
-        }
-
-    def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
-
-    def Activated(self):
-        panel = TaskAssemblyCreateJoint(7)
         Gui.Control.showDialog(panel)
 
 
@@ -325,6 +271,4 @@ if App.GuiUp:
     Gui.addCommand("Assembly_CreateJointCylindrical", CommandCreateJointCylindrical())
     Gui.addCommand("Assembly_CreateJointSlider", CommandCreateJointSlider())
     Gui.addCommand("Assembly_CreateJointBall", CommandCreateJointBall())
-    Gui.addCommand("Assembly_CreateJointPlanar", CommandCreateJointPlanar())
-    Gui.addCommand("Assembly_CreateJointParallel", CommandCreateJointParallel())
-    Gui.addCommand("Assembly_CreateJointTangent", CommandCreateJointTangent())
+    Gui.addCommand("Assembly_CreateJointDistance", CommandCreateJointDistance())
