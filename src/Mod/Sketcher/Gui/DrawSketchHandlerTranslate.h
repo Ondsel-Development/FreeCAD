@@ -24,14 +24,15 @@
 #ifndef SKETCHERGUI_DrawSketchHandlerTranslate_H
 #define SKETCHERGUI_DrawSketchHandlerTranslate_H
 
+#include <QApplication>
+
 #include <Gui/BitmapFactory.h>
 #include <Gui/Notifications.h>
 #include <Gui/Command.h>
 #include <Gui/CommandT.h>
 
-#include <Mod/Sketcher/App/SketchObject.h>
-
 #include <Mod/Sketcher/App/GeometryFacade.h>
+#include <Mod/Sketcher/App/SketchObject.h>
 
 #include "DrawSketchDefaultWidgetController.h"
 #include "DrawSketchControllableHandler.h"
@@ -73,12 +74,17 @@ public:
         , numberOfCopies(0)
         , secondNumberOfCopies(1)
     {}
+
+    DrawSketchHandlerTranslate(const DrawSketchHandlerTranslate&) = delete;
+    DrawSketchHandlerTranslate(DrawSketchHandlerTranslate&&) = delete;
+    DrawSketchHandlerTranslate& operator=(const DrawSketchHandlerTranslate&) = delete;
+    DrawSketchHandlerTranslate& operator=(DrawSketchHandlerTranslate&&) = delete;
+
     ~DrawSketchHandlerTranslate() override = default;
 
 private:
     void updateDataAndDrawToPosition(Base::Vector2d onSketchPos) override
     {
-
         switch (state()) {
             case SelectMode::SeekFirst: {
                 referencePoint = onSketchPos;
@@ -118,6 +124,7 @@ private:
             Gui::Command::commitCommand();
         }
         catch (const Base::Exception& e) {
+            e.ReportException();
             Gui::NotifyError(sketchgui,
                              QT_TRANSLATE_NOOP("Notifications", "Error"),
                              QT_TRANSLATE_NOOP("Notifications", "Failed to translate"));
@@ -184,6 +191,32 @@ private:
         continuousMode = false;
     }
 
+    bool canGoToNextMode() override
+    {
+        if (state() == SelectMode::SeekSecond
+            && firstTranslationVector.Length() < Precision::Confusion()) {
+            // Prevent validation of null translation.
+            return false;
+        }
+        if (state() == SelectMode::SeekThird
+            && secondTranslationVector.Length() < Precision::Confusion()
+            && secondNumberOfCopies > 1) {
+            return false;
+        }
+        return true;
+    }
+
+    void angleSnappingControl() override
+    {
+        if (state() == SelectMode::SeekSecond || state() == SelectMode::SeekThird) {
+            setAngleSnapping(true, referencePoint);
+        }
+
+        else {
+            setAngleSnapping(false);
+        }
+    }
+
 private:
     std::vector<int> listOfGeoIds;
     Base::Vector2d referencePoint, firstTranslationPoint, secondTranslationPoint;
@@ -232,47 +265,52 @@ private:
                 Base::Vector3d vec = firstTranslationVector * i + secondTranslationVector * k;
 
                 for (auto& geoId : listOfGeoIds) {
-                    Part::Geometry* geo = Obj->getGeometry(geoId)->copy();
+                    const Part::Geometry* pGeo = Obj->getGeometry(geoId);
+                    auto geoUniquePtr = std::unique_ptr<Part::Geometry>(pGeo->copy());
+                    Part::Geometry* geo = geoUniquePtr.get();
 
-                    bool isConstructionGeo =
-                        Sketcher::GeometryFacade::getConstruction(Obj->getGeometry(geoId));
-                    Sketcher::GeometryFacade::setConstruction(geo, isConstructionGeo);
-
-                    /*if (geo->getTypeId() == Part::GeomConic::getClassTypeId()) {
-                        Part::GeomConic* conic = static_cast<Part::GeomConic*>(geo);
-                        conic->setCenter(conic->getCenter() + vec);
-                    }*/ // That should work and used to work but somehow it does work anymore.
+                    bool isConstructionGeo = GeometryFacade::getConstruction(pGeo);
+                    GeometryFacade::setConstruction(geo, isConstructionGeo);
+                    if (GeometryFacade::isInternalAligned(pGeo)) {
+                        InternalType::InternalType type = GeometryFacade::getInternalType(pGeo);
+                        GeometryFacade::setInternalType(geo, type);
+                    }
 
                     if (isCircle(*geo)) {
-                        Part::GeomCircle* circle = static_cast<Part::GeomCircle*>(geo);
+                        Part::GeomCircle* circle = static_cast<Part::GeomCircle*>(geo);  // NOLINT
                         circle->setCenter(circle->getCenter() + vec);
                     }
                     else if (isArcOfCircle(*geo)) {
-                        Part::GeomArcOfCircle* arc = static_cast<Part::GeomArcOfCircle*>(geo);
+                        Part::GeomArcOfCircle* arc =
+                            static_cast<Part::GeomArcOfCircle*>(geo);  // NOLINT
                         arc->setCenter(arc->getCenter() + vec);
                     }
                     else if (isEllipse(*geo)) {
-                        Part::GeomEllipse* ellipse = static_cast<Part::GeomEllipse*>(geo);
+                        Part::GeomEllipse* ellipse =
+                            static_cast<Part::GeomEllipse*>(geo);  // NOLINT
                         ellipse->setCenter(ellipse->getCenter() + vec);
                     }
                     else if (isArcOfEllipse(*geo)) {
-                        Part::GeomArcOfEllipse* aoe = static_cast<Part::GeomArcOfEllipse*>(geo);
+                        Part::GeomArcOfEllipse* aoe =
+                            static_cast<Part::GeomArcOfEllipse*>(geo);  // NOLINT
                         aoe->setCenter(aoe->getCenter() + vec);
                     }
                     else if (isArcOfHyperbola(*geo)) {
-                        Part::GeomArcOfHyperbola* aoh = static_cast<Part::GeomArcOfHyperbola*>(geo);
+                        Part::GeomArcOfHyperbola* aoh =
+                            static_cast<Part::GeomArcOfHyperbola*>(geo);  // NOLINT
                         aoh->setCenter(aoh->getCenter() + vec);
                     }
                     else if (isArcOfParabola(*geo)) {
-                        Part::GeomArcOfParabola* aop = static_cast<Part::GeomArcOfParabola*>(geo);
+                        Part::GeomArcOfParabola* aop =
+                            static_cast<Part::GeomArcOfParabola*>(geo);  // NOLINT
                         aop->setCenter(aop->getCenter() + vec);
                     }
                     else if (isLineSegment(*geo)) {
-                        auto* line = static_cast<Part::GeomLineSegment*>(geo);
+                        auto* line = static_cast<Part::GeomLineSegment*>(geo);  // NOLINT
                         line->setPoints(line->getStartPoint() + vec, line->getEndPoint() + vec);
                     }
                     else if (isBSplineCurve(*geo)) {
-                        auto* bSpline = static_cast<Part::GeomBSplineCurve*>(geo);
+                        auto* bSpline = static_cast<Part::GeomBSplineCurve*>(geo);  // NOLINT
                         std::vector<Base::Vector3d> poles = bSpline->getPoles();
                         for (size_t p = 0; p < poles.size(); p++) {
                             poles[p] = poles[p] + vec;
@@ -280,11 +318,11 @@ private:
                         bSpline->setPoles(poles);
                     }
                     else if (isPoint(*geo)) {
-                        auto* point = static_cast<Part::GeomPoint*>(geo);
+                        auto* point = static_cast<Part::GeomPoint*>(geo);  // NOLINT
                         point->setPoint(point->getPoint() + vec);
                     }
 
-                    ShapeGeometry.push_back(std::move(std::unique_ptr<Part::Geometry>(geo)));
+                    ShapeGeometry.emplace_back(std::move(geoUniquePtr));
                 }
             }
         }
@@ -305,13 +343,12 @@ private:
         }
         else {
             int firstCurveCreated = getHighestCurveIndex() + 1;
-            size_t size = listOfGeoIds.size();
-            using namespace Sketcher;
+            int size = static_cast<int>(listOfGeoIds.size());
 
             const std::vector<Sketcher::Constraint*>& vals = Obj->Constraints.getValues();
-            std::vector<int> geoIdsWhoAlreadyHasEqual =
-                {};  // avoid applying equal several times if cloning distanceX and distanceY of the
-                     // same part.
+            // avoid applying equal several times if cloning distanceX and distanceY of the
+            // same part.
+            std::vector<int> geoIdsWhoAlreadyHasEqual = {};
 
             for (auto& cstr : vals) {
                 int firstIndex = indexInVec(listOfGeoIds, cstr->First);
@@ -331,11 +368,7 @@ private:
                         int thirdIndexi = firstCurveCreated + thirdIndex + size * (i - 1)
                             + size * (numberOfCopiesToMake + 1) * k;
 
-                        auto newConstr = std::make_unique<Constraint>();
-                        newConstr->Type = cstr->Type;
-                        newConstr->FirstPos = cstr->FirstPos;
-                        newConstr->SecondPos = cstr->SecondPos;
-                        newConstr->ThirdPos = cstr->ThirdPos;
+                        auto newConstr = std::unique_ptr<Constraint>(cstr->copy());
                         newConstr->First = firstIndexi;
 
                         if ((cstr->Type == Symmetric || cstr->Type == Tangent
@@ -347,7 +380,8 @@ private:
                         else if ((cstr->Type == Coincident || cstr->Type == Tangent
                                   || cstr->Type == Symmetric || cstr->Type == Perpendicular
                                   || cstr->Type == Parallel || cstr->Type == Equal
-                                  || cstr->Type == Angle || cstr->Type == PointOnObject)
+                                  || cstr->Type == Angle || cstr->Type == PointOnObject
+                                  || cstr->Type == InternalAlignment)
                                  && firstIndex >= 0 && secondIndex >= 0
                                  && thirdIndex == GeoEnum::GeoUndef) {
                             newConstr->Second = secondIndexi;
@@ -395,14 +429,14 @@ private:
         }
     }
 
-    int indexInVec(std::vector<int> vec, int elem)
+    int indexInVec(const std::vector<int> vec, int elem) const
     {
         if (elem == Sketcher::GeoEnum::GeoUndef) {
             return Sketcher::GeoEnum::GeoUndef;
         }
         for (size_t i = 0; i < vec.size(); i++) {
             if (vec[i] == elem) {
-                return i;
+                return static_cast<int>(i);
             }
         }
         return -1;
@@ -488,10 +522,10 @@ void DSHTranslateController::configureToolWidget()
     toolWidget->setParameter(OnViewParameter::Second, 1.0);
     toolWidget->configureParameterUnit(OnViewParameter::First, Base::Unit());
     toolWidget->configureParameterUnit(OnViewParameter::Second, Base::Unit());
-    toolWidget->configureParameterMin(OnViewParameter::First, 0.0);
-    toolWidget->configureParameterMin(OnViewParameter::Second, 0.0);
-    toolWidget->configureParameterMax(OnViewParameter::First, 9999.0);
-    toolWidget->configureParameterMax(OnViewParameter::Second, 9999.0);
+    toolWidget->configureParameterMin(OnViewParameter::First, 0.0);      // NOLINT
+    toolWidget->configureParameterMin(OnViewParameter::Second, 0.0);     // NOLINT
+    toolWidget->configureParameterMax(OnViewParameter::First, 9999.0);   // NOLINT
+    toolWidget->configureParameterMax(OnViewParameter::Second, 9999.0);  // NOLINT
     toolWidget->configureParameterDecimals(OnViewParameter::First, 0);
     toolWidget->configureParameterDecimals(OnViewParameter::Second, 0);
 }
