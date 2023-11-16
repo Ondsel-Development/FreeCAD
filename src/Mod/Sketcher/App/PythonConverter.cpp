@@ -206,16 +206,85 @@ PythonConverter::SingleGeometry PythonConverter::process(const Part::Geometry* g
              [](const Part::Geometry* geo) {
                  auto ellipse = static_cast<const Part::GeomEllipse*>(geo);
                  SingleGeometry sg;
-                 auto periapsis =
-                     ellipse->getCenter() + ellipse->getMajorAxisDir() * ellipse->getMajorRadius();
-                 auto positiveB =
-                     ellipse->getCenter() + ellipse->getMinorAxisDir() * ellipse->getMinorRadius();
                  auto center = ellipse->getCenter();
+                 auto periapsis = center + ellipse->getMajorAxisDir() * ellipse->getMajorRadius();
+                 auto positiveB = center + ellipse->getMinorAxisDir() * ellipse->getMinorRadius();
                  sg.creation =
                      boost::str(boost::format("Part.Ellipse(App.Vector(%f, %f, %f), App.Vector(%f, "
                                               "%f, %f), App.Vector(%f, %f, %f))")
                                 % periapsis.x % periapsis.y % periapsis.z % positiveB.x
                                 % positiveB.y % positiveB.z % center.x % center.y % center.z);
+                 sg.construction = Sketcher::GeometryFacade::getConstruction(geo);
+                 return sg;
+             }},
+            {Part::GeomArcOfEllipse::getClassTypeId(),
+             [](const Part::Geometry* geo) {
+                 auto aoe = static_cast<const Part::GeomArcOfEllipse*>(geo);
+                 SingleGeometry sg;
+                 auto center = aoe->getCenter();
+                 auto periapsis = center + aoe->getMajorAxisDir() * aoe->getMajorRadius();
+                 auto positiveB = center + aoe->getMinorAxisDir() * aoe->getMinorRadius();
+                 sg.creation = boost::str(
+                     boost::format(
+                         "Part.ArcOfEllipse(Part.Ellipse(App.Vector(%f, %f, %f), App.Vector(%f, "
+                         "%f, %f), App.Vector(%f, %f, %f)), %f, %f)")
+                     % periapsis.x % periapsis.y % periapsis.z % positiveB.x % positiveB.y
+                     % positiveB.z % center.x % center.y % center.z % aoe->getFirstParameter()
+                     % aoe->getLastParameter());
+                 sg.construction = Sketcher::GeometryFacade::getConstruction(geo);
+                 return sg;
+             }},
+            {Part::GeomArcOfHyperbola::getClassTypeId(),
+             [](const Part::Geometry* geo) {
+                 auto aoh = static_cast<const Part::GeomArcOfHyperbola*>(geo);
+                 SingleGeometry sg;
+                 auto center = aoh->getCenter();
+                 auto majAxisPoint = center + aoh->getMajorAxisDir() * aoh->getMajorRadius();
+                 auto minAxisPoint = center + aoh->getMinorAxisDir() * aoh->getMinorRadius();
+                 sg.creation = boost::str(
+                     boost::format("Part.ArcOfHyperbola(Part.Hyperbola(App.Vector(%f, %f, %f), "
+                                   "App.Vector(%f, %f, %f), App.Vector(%f, %f, %f)), %f, %f)")
+                     % majAxisPoint.x % majAxisPoint.y % majAxisPoint.z % minAxisPoint.x
+                     % minAxisPoint.y % minAxisPoint.z % center.x % center.y % center.z
+                     % aoh->getFirstParameter() % aoh->getLastParameter());
+                 sg.construction = Sketcher::GeometryFacade::getConstruction(geo);
+                 return sg;
+             }},
+            {Part::GeomArcOfParabola::getClassTypeId(),
+             [](const Part::Geometry* geo) {
+                 auto aop = static_cast<const Part::GeomArcOfParabola*>(geo);
+                 SingleGeometry sg;
+                 auto focus = aop->getFocus();
+                 auto axisPoint = aop->getCenter();
+                 sg.creation = boost::str(
+                     boost::format("Part.ArcOfParabola(Part.Parabola(App.Vector(%f, %f, %f), "
+                                   "App.Vector(%f, %f, %f), App.Vector(0, 0, 1)), %f, %f)")
+                     % focus.x % focus.y % focus.z % axisPoint.x % axisPoint.y % axisPoint.z
+                     % aop->getFirstParameter() % aop->getLastParameter());
+                 sg.construction = Sketcher::GeometryFacade::getConstruction(geo);
+                 return sg;
+             }},
+            {Part::GeomBSplineCurve::getClassTypeId(),
+             [](const Part::Geometry* geo) {
+                 auto bSpline = static_cast<const Part::GeomBSplineCurve*>(geo);
+
+                 std::stringstream stream;
+                 std::vector<Base::Vector3d> poles = bSpline->getPoles();
+                 for (auto& pole : poles) {
+                     stream << "App.Vector(" << pole.x << "," << pole.y << "),";
+                 }
+                 std::string controlpoints = stream.str();
+                 // remove last comma and add brackets
+                 int index = controlpoints.rfind(',');
+                 controlpoints.resize(index);
+                 controlpoints.insert(0, 1, '[');
+                 controlpoints.append(1, ']');
+
+                 SingleGeometry sg;
+                 sg.creation =
+                     boost::str(boost::format("Part.BSplineCurve (%s,None,None,%s,%d,None,False)")
+                                % controlpoints.c_str() % (bSpline->isPeriodic() ? "True" : "False")
+                                % bSpline->getDegree());
                  sg.construction = Sketcher::GeometryFacade::getConstruction(geo);
                  return sg;
              }},
@@ -336,26 +405,37 @@ std::string PythonConverter::process(const Sketcher::Constraint* constraint)
              }},
             {Sketcher::InternalAlignment,
              [](const Sketcher::Constraint* constr) {
-                 if (constr->InternalAlignmentIndex == EllipseMajorDiameter
-                     || constr->InternalAlignmentIndex == EllipseMinorDiameter) {
+                 if (constr->AlignmentType == EllipseMajorDiameter
+                     || constr->AlignmentType == EllipseMinorDiameter
+                     || constr->AlignmentType == HyperbolaMajor
+                     || constr->AlignmentType == HyperbolaMinor
+                     || constr->AlignmentType == ParabolaFocalAxis) {
                      return boost::str(
                          boost::format("Sketcher.Constraint('InternalAlignment:%s', %i, %i)")
                          % constr->internalAlignmentTypeToString() % constr->First
                          % constr->Second);
                  }
-                 else if (constr->InternalAlignmentIndex == EllipseFocus1
-                          || constr->InternalAlignmentIndex == EllipseFocus2) {
+                 else if (constr->AlignmentType == EllipseFocus1
+                          || constr->AlignmentType == EllipseFocus2
+                          || constr->AlignmentType == HyperbolaFocus
+                          || constr->AlignmentType == ParabolaFocus) {
                      return boost::str(
                          boost::format("Sketcher.Constraint('InternalAlignment:%s', %i, %i, %i)")
                          % constr->internalAlignmentTypeToString() % constr->First
                          % static_cast<int>(constr->FirstPos) % constr->Second);
                  }
-                 else if (constr->InternalAlignmentIndex == BSplineControlPoint) {
+                 else if (constr->AlignmentType == BSplineControlPoint) {
                      return boost::str(
                          boost::format(
                              "Sketcher.Constraint('InternalAlignment:%s', %i, %i, %i, %i)")
                          % constr->internalAlignmentTypeToString() % constr->First
                          % static_cast<int>(constr->FirstPos) % constr->Second
+                         % constr->InternalAlignmentIndex);
+                 }
+                 else if (constr->AlignmentType == BSplineKnotPoint) {
+                     return boost::str(
+                         boost::format("Sketcher.Constraint('InternalAlignment:%s', %i, 1, %i, %i)")
+                         % constr->internalAlignmentTypeToString() % constr->First % constr->Second
                          % constr->InternalAlignmentIndex);
                  }
 
