@@ -199,7 +199,8 @@ class CommandCreateJointDistance:
         }
 
     def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
+        return False
+        # return UtilsAssembly.activeAssembly() is not None
 
     def Activated(self):
         panel = TaskAssemblyCreateJoint(5)
