@@ -25,6 +25,10 @@
 #ifndef ASSEMBLY_AssemblyObject_H
 #define ASSEMBLY_AssemblyObject_H
 
+
+#include <GeomAbs_CurveType.hxx>
+#include <GeomAbs_SurfaceType.hxx>
+
 #include <Mod/Assembly/AssemblyGlobal.h>
 
 #include <App/FeaturePython.h>
@@ -48,6 +52,8 @@ class Rotation;
 
 namespace Assembly
 {
+
+class JointGroup;
 
 // This enum has to be the same as the one in JointObject.py
 enum class JointType
@@ -84,8 +90,8 @@ public:
     std::shared_ptr<MbD::ASMTPart> getMbDPart(App::DocumentObject* obj);
     std::shared_ptr<MbD::ASMTMarker> makeMbdMarker(std::string& name, Base::Placement& plc);
     std::vector<std::shared_ptr<MbD::ASMTJoint>> makeMbdJoint(App::DocumentObject* joint);
-    std::vector<std::shared_ptr<MbD::ASMTJoint>> makeMbdDistanceJoint(App::DocumentObject* joint);
-    std::shared_ptr<MbD::ASMTJoint> makeMbdJointOfType(JointType jointType);
+    std::shared_ptr<MbD::ASMTJoint> makeMbdJointOfType(App::DocumentObject* joint,
+                                                       JointType jointType);
     bool jointUseOffset(JointType jointType);
     std::string handleOneSideOfJoint(App::DocumentObject* joint,
                                      JointType jointType,
@@ -95,11 +101,9 @@ public:
     bool fixGroundedParts();
     void jointParts(std::vector<App::DocumentObject*> joints);
     std::vector<App::DocumentObject*> getJoints();
+    JointGroup* getJointGroup();
 
-    // helper function to get objects from properties
-    std::string getElementTypeFromProp(App::DocumentObject* obj, const char* propName);
-    Base::Placement getPlacementFromProp(App::DocumentObject* obj, const char* propName);
-    App::DocumentObject* getLinkObjFromProp(App::DocumentObject* joint, const char* propName);
+    void swapJCS(App::DocumentObject* joint);
 
     void applyOffsetToPlacement(Base::Placement& plc, App::DocumentObject* joint);
     void setNewPlacements();
@@ -107,6 +111,18 @@ public:
 
     double getObjMass(App::DocumentObject* obj);
     void setObjMasses(std::vector<std::pair<App::DocumentObject*, double>> objectMasses);
+
+    bool isEdgeType(App::DocumentObject* obj, const char* elName, GeomAbs_CurveType type);
+    bool isFaceType(App::DocumentObject* obj, const char* elName, GeomAbs_SurfaceType type);
+
+    // getters to get from properties
+    double getJointOffset(App::DocumentObject* joint);
+    JointType getJointType(App::DocumentObject* joint);
+    const char* getElementFromProp(App::DocumentObject* obj, const char* propName);
+    std::string getElementTypeFromProp(App::DocumentObject* obj, const char* propName);
+    Base::Placement getPlacementFromProp(App::DocumentObject* obj, const char* propName);
+    App::DocumentObject* getLinkObjFromProp(App::DocumentObject* joint, const char* propName);
+    App::DocumentObject* getLinkedObjFromProp(App::DocumentObject* joint, const char* propName);
 
 private:
     std::shared_ptr<MbD::ASMTAssembly> mbdAssembly;
