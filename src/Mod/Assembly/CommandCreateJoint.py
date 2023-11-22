@@ -42,6 +42,10 @@ __author__ = "Ondsel"
 __url__ = "https://www.freecad.org"
 
 
+def isCreateJointActive():
+    return UtilsAssembly.isAssemblyGrounded()
+
+
 class CommandCreateJointFixed:
     def __init__(self):
         pass
@@ -62,7 +66,7 @@ class CommandCreateJointFixed:
         }
 
     def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
+        return isCreateJointActive()
 
     def Activated(self):
         panel = TaskAssemblyCreateJoint(0)
@@ -89,7 +93,7 @@ class CommandCreateJointRevolute:
         }
 
     def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
+        return isCreateJointActive()
 
     def Activated(self):
         panel = TaskAssemblyCreateJoint(1)
@@ -118,7 +122,7 @@ class CommandCreateJointCylindrical:
         }
 
     def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
+        return isCreateJointActive()
 
     def Activated(self):
         panel = TaskAssemblyCreateJoint(2)
@@ -145,7 +149,7 @@ class CommandCreateJointSlider:
         }
 
     def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
+        return isCreateJointActive()
 
     def Activated(self):
         panel = TaskAssemblyCreateJoint(3)
@@ -172,7 +176,7 @@ class CommandCreateJointBall:
         }
 
     def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
+        return isCreateJointActive()
 
     def Activated(self):
         panel = TaskAssemblyCreateJoint(4)
@@ -200,7 +204,7 @@ class CommandCreateJointDistance:
 
     def IsActive(self):
         return False
-        # return UtilsAssembly.activeAssembly() is not None
+        # return isCreateJointActive()
 
     def Activated(self):
         panel = TaskAssemblyCreateJoint(5)

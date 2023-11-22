@@ -252,3 +252,17 @@ def getJointGroup(assembly):
     if not joint_group:
         joint_group = assembly.newObject("Assembly::JointGroup", "Joints")
     return joint_group
+
+
+def isAssemblyGrounded():
+    assembly = activeAssembly()
+    if not assembly:
+        return False
+
+    jointGroup = getJointGroup(assembly)
+
+    for joint in jointGroup.Group:
+        if hasattr(joint, "ObjectToGround"):
+            return True
+
+    return False
