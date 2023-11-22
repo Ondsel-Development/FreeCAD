@@ -60,7 +60,7 @@ class CommandSolveAssembly:
         }
 
     def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
+        return UtilsAssembly.isAssemblyGrounded()
 
     def Activated(self):
         assembly = UtilsAssembly.activeAssembly()
