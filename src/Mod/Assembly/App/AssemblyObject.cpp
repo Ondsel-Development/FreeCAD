@@ -117,6 +117,73 @@ std::vector<App::DocumentObject*> AssemblyObject::getJoints()
     return joints;
 }
 
+void AssemblyObject::removeUnconnectedJoints(std::vector<App::DocumentObject*>& joints,
+                                             std::vector<App::DocumentObject*> groundedObjs)
+{
+    std::set<App::DocumentObject*> connectedParts;
+
+    // Initialize connectedParts with groundedObjs
+    for (auto* groundedObj : groundedObjs) {
+        connectedParts.insert(groundedObj);
+    }
+
+    // Perform a traversal from each grounded object
+    for (auto* groundedObj : groundedObjs) {
+        traverseAndMarkConnectedParts(groundedObj, connectedParts, joints);
+    }
+
+    // Filter out unconnected joints
+    joints.erase(
+        std::remove_if(
+            joints.begin(),
+            joints.end(),
+            [&connectedParts, this](App::DocumentObject* joint) {
+                App::DocumentObject* obj1 = getLinkObjFromProp(joint, "Object1");
+                App::DocumentObject* obj2 = getLinkObjFromProp(joint, "Object2");
+                if ((connectedParts.find(obj1) == connectedParts.end())
+                    || (connectedParts.find(obj2) == connectedParts.end())) {
+                    Base::Console().Warning(
+                        "%s is unconnected to a grounded part so it is ignored.\n",
+                        joint->getFullName());
+                    return true;  // Remove joint if any connected object is not in connectedParts
+                }
+                return false;
+            }),
+        joints.end());
+}
+
+void AssemblyObject::traverseAndMarkConnectedParts(App::DocumentObject* currentObj,
+                                                   std::set<App::DocumentObject*>& connectedParts,
+                                                   const std::vector<App::DocumentObject*>& joints)
+{
+    // getConnectedParts returns the objs connected to the currentObj by any joint
+    auto connectedObjs = getConnectedParts(currentObj, joints);
+    for (auto* nextObj : connectedObjs) {
+        if (connectedParts.find(nextObj) == connectedParts.end()) {
+            connectedParts.insert(nextObj);
+            traverseAndMarkConnectedParts(nextObj, connectedParts, joints);
+        }
+    }
+}
+
+std::vector<App::DocumentObject*>
+AssemblyObject::getConnectedParts(App::DocumentObject* part,
+                                  const std::vector<App::DocumentObject*>& joints)
+{
+    std::vector<App::DocumentObject*> connectedParts;
+    for (auto joint : joints) {
+        App::DocumentObject* obj1 = getLinkObjFromProp(joint, "Object1");
+        App::DocumentObject* obj2 = getLinkObjFromProp(joint, "Object2");
+        if (obj1 == part) {
+            connectedParts.push_back(obj2);
+        }
+        else if (obj2 == part) {
+            connectedParts.push_back(obj1);
+        }
+    }
+    return connectedParts;
+}
+
 JointGroup* AssemblyObject::getJointGroup()
 {
     App::Document* doc = getDocument();
@@ -134,14 +201,14 @@ JointGroup* AssemblyObject::getJointGroup()
     return nullptr;
 }
 
-bool AssemblyObject::fixGroundedParts()
+std::vector<App::DocumentObject*> AssemblyObject::fixGroundedParts()
 {
     JointGroup* jointGroup = getJointGroup();
     if (!jointGroup) {
         return {};
     }
 
-    bool onePartFixed = false;
+    std::vector<App::DocumentObject*> groundedObjs;
 
     Base::PyGILStateLocker lock;
     for (auto obj : jointGroup->getObjects()) {
@@ -157,10 +224,10 @@ bool AssemblyObject::fixGroundedParts()
             Base::Placement plc = getPlacementFromProp(obj, "Placement");
             std::string str = obj->getFullName();
             fixGroundedPart(objToGround, plc, str);
-            onePartFixed = true;
+            groundedObjs.push_back(objToGround);
         }
     }
-    return onePartFixed;
+    return groundedObjs;
 }
 
 void AssemblyObject::fixGroundedPart(App::DocumentObject* obj,
@@ -205,19 +272,18 @@ void AssemblyObject::jointParts(std::vector<App::DocumentObject*> joints)
 
 int AssemblyObject::solve()
 {
-    // Base::Console().Warning("solve\n");
     mbdAssembly = makeMbdAssembly();
     objectPartMap.clear();
 
-    if (!fixGroundedParts()) {
+    std::vector<App::DocumentObject*> groundedObjs = fixGroundedParts();
+    if (groundedObjs.empty()) {
         // If no part fixed we can't solve.
-        // TODO : change to notification area message.
-        Base::Console().Warning(
-            QT_TRANSLATE_NOOP("Assembly", "No fixed parts, assembly cannot be solved.") "\n");
         return -6;
     }
 
     std::vector<App::DocumentObject*> joints = getJoints();
+
+    removeUnconnectedJoints(joints, groundedObjs);
 
     jointParts(joints);
 
