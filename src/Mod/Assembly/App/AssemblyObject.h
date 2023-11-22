@@ -98,9 +98,18 @@ public:
                                      const char* propObjLinkName,
                                      const char* propPlcName);
     void fixGroundedPart(App::DocumentObject* obj, Base::Placement& plc, std::string& jointName);
-    bool fixGroundedParts();
+    std::vector<App::DocumentObject*> fixGroundedParts();
     void jointParts(std::vector<App::DocumentObject*> joints);
     std::vector<App::DocumentObject*> getJoints();
+
+    void removeUnconnectedJoints(std::vector<App::DocumentObject*>& joints,
+                                 std::vector<App::DocumentObject*> groundedObjs);
+    void traverseAndMarkConnectedParts(App::DocumentObject* currentPart,
+                                       std::set<App::DocumentObject*>& connectedParts,
+                                       const std::vector<App::DocumentObject*>& joints);
+    std::vector<App::DocumentObject*>
+    getConnectedParts(App::DocumentObject* part, const std::vector<App::DocumentObject*>& joints);
+
     JointGroup* getJointGroup();
 
     void swapJCS(App::DocumentObject* joint);
