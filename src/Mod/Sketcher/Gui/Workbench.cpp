@@ -541,7 +541,11 @@ inline void SketcherAddWorkbenchTools<Gui::MenuItem>(Gui::MenuItem& consaccel)
               << "Sketcher_RemoveAxesAlignment"
               << "Separator"
               << "Sketcher_DeleteAllGeometry"
-              << "Sketcher_DeleteAllConstraints";
+              << "Sketcher_DeleteAllConstraints"
+              << "Separator"
+              << "Sketcher_CopyClipboard"
+              << "Sketcher_Cut"
+              << "Sketcher_Paste";
 }
 
 template<>

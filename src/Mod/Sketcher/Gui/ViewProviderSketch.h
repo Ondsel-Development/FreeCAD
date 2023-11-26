@@ -667,6 +667,8 @@ public:
                          const Gui::View3DInventorViewer* viewer) override;
     //@}
 
+    //********* ViewProviderSketchShortcutListenerAttorney ***********//
+    void deleteSelected();
 
     /// Control the overlays appearing on the Tree and reflecting different sketcher states
     QIcon mergeColorfulOverlayIcons(const QIcon& orig) const override;
@@ -859,9 +861,6 @@ private:
     bool isCurveSelected(int curveId) const;
 
     bool isConstraintSelected(int constraintId) const;
-
-    //********* ViewProviderSketchShortcutListenerAttorney ***********//
-    void deleteSelected();
 
     //********* ViewProviderSketchDrawSketchHandlerAttorney **********//
     void setConstraintSelectability(bool enabled = true);
