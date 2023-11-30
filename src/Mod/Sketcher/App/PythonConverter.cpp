@@ -29,13 +29,14 @@
 #include <Base/Exception.h>
 #include <Mod/Sketcher/App/Constraint.h>
 #include <Mod/Sketcher/App/GeometryFacade.h>
+#include <Mod/Sketcher/App/SketchObject.h>
 
 #include "PythonConverter.h"
 
 
 using namespace Sketcher;
 
-std::string PythonConverter::convert(const Part::Geometry* geo)
+std::string PythonConverter::convert(const Part::Geometry* geo, int lastGeoId, Mode mode)
 {
     // "addGeometry(Part.LineSegment(App.Vector(%f,%f,0),App.Vector(%f,%f,0)),%s)"
 
@@ -44,6 +45,17 @@ std::string PythonConverter::convert(const Part::Geometry* geo)
 
     command = boost::str(boost::format("addGeometry(%s,%s)\n") % sg.creation
                          % (sg.construction ? "True" : "False"));
+
+    if ((geo->getTypeId() != Part::GeomEllipse::getClassTypeId()
+         || geo->getTypeId() != Part::GeomArcOfEllipse::getClassTypeId()
+         || geo->getTypeId() != Part::GeomArcOfHyperbola::getClassTypeId()
+         || geo->getTypeId() != Part::GeomArcOfParabola::getClassTypeId()
+         || geo->getTypeId() != Part::GeomBSplineCurve::getClassTypeId())
+        && mode == Mode::CreateInternalGeometry) {
+        std::string newcommand =
+            boost::str(boost::format("exposeInternalGeometry(%d)\n") % (lastGeoId + 1));
+        command += newcommand;
+    }
 
     return command;
 }
@@ -60,7 +72,9 @@ std::string PythonConverter::convert(const Sketcher::Constraint* constraint)
 }
 
 std::string PythonConverter::convert(const std::string& doc,
-                                     const std::vector<Part::Geometry*>& geos)
+                                     const std::vector<Part::Geometry*>& geos,
+                                     int lastGeoId,
+                                     Mode mode)
 {
     if (geos.empty()) {
         return std::string();
@@ -132,6 +146,21 @@ std::string PythonConverter::convert(const std::string& doc,
     }
 
     addToCommands(geolist, ngeos, currentconstruction);
+
+    if (mode == Mode::CreateInternalGeometry) {
+        for (auto geo : geos) {
+            lastGeoId++;
+            if (geo->getTypeId() != Part::GeomEllipse::getClassTypeId()
+                || geo->getTypeId() != Part::GeomArcOfEllipse::getClassTypeId()
+                || geo->getTypeId() != Part::GeomArcOfHyperbola::getClassTypeId()
+                || geo->getTypeId() != Part::GeomArcOfParabola::getClassTypeId()
+                || geo->getTypeId() != Part::GeomBSplineCurve::getClassTypeId()) {
+                std::string newcommand =
+                    boost::str(boost::format("exposeInternalGeometry(%d)\n") % (lastGeoId));
+                command += newcommand;
+            }
+        }
+    }
 
     return command;
 }

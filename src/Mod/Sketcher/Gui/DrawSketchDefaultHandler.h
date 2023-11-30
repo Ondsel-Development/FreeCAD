@@ -1109,12 +1109,16 @@ protected:
      * ShapeConstraints vectors to the SketchObject.*/
     void commandAddShapeGeometryAndConstraints()
     {
+        int lastCurve = sketchgui->getSketchObject()->getHighestCurveIndex();
+
         auto shapeGeometry = toPointerVector(ShapeGeometry);
-        Gui::Command::doCommand(
-            Gui::Command::Doc,
-            Sketcher::PythonConverter::convert(Gui::Command::getObjectCmd(sketchgui->getObject()),
-                                               shapeGeometry)
-                .c_str());
+        Gui::Command::doCommand(Gui::Command::Doc,
+                                Sketcher::PythonConverter::convert(
+                                    Gui::Command::getObjectCmd(sketchgui->getObject()),
+                                    shapeGeometry,
+                                    lastCurve,
+                                    Sketcher::PythonConverter::Mode::OmitInternalGeometry)
+                                    .c_str());
 
         auto shapeConstraints = toPointerVector(ShapeConstraints);
         Gui::Command::doCommand(

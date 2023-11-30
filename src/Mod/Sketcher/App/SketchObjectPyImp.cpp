@@ -1880,7 +1880,9 @@ PyObject* SketchObjectPy::toPythonCommands(PyObject* args)
 
     auto sketch = this->getSketchObjectPtr();
 
-    std::string geometry = PythonConverter::convert("ActiveSketch", sketch->Geometry.getValues());
+    std::string geometry = PythonConverter::convert("ActiveSketch",
+                                                    sketch->Geometry.getValues(),
+                                                    sketch->getHighestCurveIndex());
     std::string constraints =
         PythonConverter::convert("ActiveSketch", sketch->Constraints.getValues());
 
