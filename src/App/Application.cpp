@@ -2904,7 +2904,9 @@ void Application::LoadParameters()
     _pcSysParamMngr->SetSerializer(new ParameterSerializer(mConfig["SystemParameter"]));
 
     _pcUserParamMngr = ParameterManager::Create();
-    _pcUserParamMngr->SetSerializer(new ParameterSerializer(mConfig["UserParameter"]));
+
+    auto UserParamMngr = ParameterManager::Create();
+    UserParamMngr->SetSerializer(new ParameterSerializer(mConfig["UserParameter"]));
 
     try {
         if (_pcSysParamMngr->LoadOrCreateDocument() && !(mConfig["Verbose"] == "Strict")) {
@@ -2926,22 +2928,20 @@ void Application::LoadParameters()
     }
 
     try {
-        if (_pcUserParamMngr->LoadOrCreateDocument() && !(mConfig["Verbose"] == "Strict")) {
-            // The user parameter file doesn't exist. When an alternative parameter file is offered
-            // this will be used.
-            std::map<std::string, std::string>::iterator it = mConfig.find("UserParameterTemplate");
-            if (it != mConfig.end()) {
-                QString path = QString::fromUtf8(it->second.c_str());
-                if (QDir(path).isRelative()) {
-                    QString home = QString::fromUtf8(mConfig["AppHomePath"].c_str());
-                    path = QFileInfo(QDir(home), path).absoluteFilePath();
-                }
-                QFileInfo fi(path);
-                if (fi.exists()) {
-                    _pcUserParamMngr->LoadDocument(path.toUtf8().constData());
-                }
-            }
-
+        // Load parameter template 
+        std::map<std::string, std::string>::iterator it = mConfig.find("UserParameterTemplate"); 
+        if (it != mConfig.end()) { 
+            QString path = QString::fromUtf8(it->second.c_str()); 
+            if (QDir(path).isRelative()) { 
+                QString home = QString::fromUtf8(mConfig["AppHomePath"].c_str()); 
+                path = QFileInfo(QDir(home), path).absoluteFilePath(); 
+            } 
+            QFileInfo fi(path); 
+            if (fi.exists()) { 
+                _pcUserParamMngr->LoadDocument(path.toUtf8().constData()); 
+            } 
+        }
+        if (UserParamMngr->LoadOrCreateDocument() && !(mConfig["Verbose"] == "Strict")) { 
             // Configuration file optional when using as Python module
             if (!Py_IsInitialized()) {
                 Base::Console().Warning("   User settings do not exist, writing initial one\n");
@@ -2949,6 +2949,11 @@ void Application::LoadParameters()
                                         "   or your configuration was deleted or moved. The system defaults\n"
                                         "   will be automatically generated for you.\n");
             }
+        }
+        std::vector<Base::Reference<ParameterGrp>> Grps = UserParamMngr->GetGroups();
+        std::vector<Base::Reference<ParameterGrp>>::iterator It;
+        for (It = Grps.begin(); It != Grps.end(); ++It) {
+            (*It)->insertTo(_pcUserParamMngr->GetGroup((*It)->GetGroupName()));
         }
     }
     catch (const Base::Exception& e) {
