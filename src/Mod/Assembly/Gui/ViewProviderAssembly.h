@@ -57,6 +57,12 @@ public:
     void unsetEdit(int ModNum) override;
     bool isInEditMode();
 
+    /// Ask the view provider if it accepts object deletions while in edit
+    bool acceptDeletionsInEdit() override
+    {
+        return true;
+    }
+
     App::DocumentObject* getActivePart();
 
     /// is called when the provider is in edit and the mouse is moved
