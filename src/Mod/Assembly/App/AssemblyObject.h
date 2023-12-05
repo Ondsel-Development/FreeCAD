@@ -93,14 +93,17 @@ public:
     std::shared_ptr<MbD::ASMTJoint> makeMbdJointOfType(App::DocumentObject* joint,
                                                        JointType jointType);
     bool jointUseOffset(JointType jointType);
+    bool jointUseRotation(JointType jointType);
+    bool jointUseReverse(JointType jointType);
     std::string handleOneSideOfJoint(App::DocumentObject* joint,
                                      JointType jointType,
                                      const char* propObjLinkName,
                                      const char* propPlcName);
-    void fixGroundedPart(App::DocumentObject* obj, Base::Placement& plc, std::string& jointName);
-    std::vector<App::DocumentObject*> fixGroundedParts();
     void jointParts(std::vector<App::DocumentObject*> joints);
     std::vector<App::DocumentObject*> getJoints();
+    std::vector<App::DocumentObject*> getGroundedJoints();
+    void fixGroundedPart(App::DocumentObject* obj, Base::Placement& plc, std::string& jointName);
+    std::vector<App::DocumentObject*> fixGroundedParts();
 
     void removeUnconnectedJoints(std::vector<App::DocumentObject*>& joints,
                                  std::vector<App::DocumentObject*> groundedObjs);
@@ -115,6 +118,8 @@ public:
     void swapJCS(App::DocumentObject* joint);
 
     void applyOffsetToPlacement(Base::Placement& plc, App::DocumentObject* joint);
+    void applyRotationToPlacement(Base::Placement& plc, App::DocumentObject* joint);
+    void applyReverseToPlacement(Base::Placement& plc, App::DocumentObject* joint);
     void setNewPlacements();
     void recomputeJointPlacements(std::vector<App::DocumentObject*> joints);
 
@@ -126,6 +131,8 @@ public:
 
     // getters to get from properties
     double getJointOffset(App::DocumentObject* joint);
+    double getJointRotation(App::DocumentObject* joint);
+    double getJointReverse(App::DocumentObject* joint);
     JointType getJointType(App::DocumentObject* joint);
     const char* getElementFromProp(App::DocumentObject* obj, const char* propName);
     std::string getElementTypeFromProp(App::DocumentObject* obj, const char* propName);

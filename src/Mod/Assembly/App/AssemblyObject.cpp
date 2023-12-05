@@ -117,6 +117,31 @@ std::vector<App::DocumentObject*> AssemblyObject::getJoints()
     return joints;
 }
 
+std::vector<App::DocumentObject*> AssemblyObject::getGroundedJoints()
+{
+    std::vector<App::DocumentObject*> joints = {};
+
+    JointGroup* jointGroup = getJointGroup();
+    if (!jointGroup) {
+        return {};
+    }
+
+    Base::PyGILStateLocker lock;
+    for (auto obj : jointGroup->getObjects()) {
+        if (!obj) {
+            continue;
+        }
+
+        auto* propObj = dynamic_cast<App::PropertyLink*>(obj->getPropertyByName("ObjectToGround"));
+
+        if (propObj) {
+            joints.push_back(obj);
+        }
+    }
+
+    return joints;
+}
+
 void AssemblyObject::removeUnconnectedJoints(std::vector<App::DocumentObject*>& joints,
                                              std::vector<App::DocumentObject*> groundedObjs)
 {
@@ -203,15 +228,10 @@ JointGroup* AssemblyObject::getJointGroup()
 
 std::vector<App::DocumentObject*> AssemblyObject::fixGroundedParts()
 {
-    JointGroup* jointGroup = getJointGroup();
-    if (!jointGroup) {
-        return {};
-    }
+    std::vector<App::DocumentObject*> groundedJoints = getGroundedJoints();
 
     std::vector<App::DocumentObject*> groundedObjs;
-
-    Base::PyGILStateLocker lock;
-    for (auto obj : jointGroup->getObjects()) {
+    for (auto obj : groundedJoints) {
         if (!obj) {
             continue;
         }
@@ -493,8 +513,16 @@ std::string AssemblyObject::handleOneSideOfJoint(App::DocumentObject* joint,
     plc = objPlc.inverse() * plc;
 
     // Now we apply the offset if required.
-    if (propLinkName == "Object2" && jointUseOffset(jointType)) {
-        applyOffsetToPlacement(plc, joint);
+    if (propLinkName == "Part2") {
+        if (jointUseOffset(jointType)) {
+            applyOffsetToPlacement(plc, joint);
+        }
+        if (jointUseRotation(jointType)) {
+            applyRotationToPlacement(plc, joint);
+        }
+        if (jointUseReverse(jointType)) {
+            applyReverseToPlacement(plc, joint);
+        }
     }
 
     std::string markerName = joint->getFullName();
@@ -643,10 +671,66 @@ void AssemblyObject::applyOffsetToPlacement(Base::Placement& plc, App::DocumentO
     plc.setPosition(pos);
 }
 
+void AssemblyObject::applyRotationToPlacement(Base::Placement& plc, App::DocumentObject* joint)
+{
+    double rotation = getJointRotation(joint);
+
+    Base::Rotation rot = plc.getRotation();
+    Base::Vector3d axis;
+    double angle;
+    rot.getValue(axis, angle);
+    rot.setValue(axis, fmod(angle + rotation, 2 * M_PI));
+
+    plc.setRotation(rot);
+}
+
+void AssemblyObject::applyReverseToPlacement(Base::Placement& plc2, App::DocumentObject* joint)
+{
+    // TODO : depends on how the solver can manage this.
+    // Base::Placement plc1 = getPlacementFromProp(joint, "Placement1");
+    // Base::Rotation rot1 = plc1.getRotation();
+    // Base::Rotation rot2 = plc2.getRotation();
+    // Base::Vector3d axis1;
+    // Base::Vector3d axis2;
+    // double angle;
+    // rot1.getValue(axis1, angle);
+    // rot2.getValue(axis2, angle);
+
+    // bool sameDir = axis1.Dot(axis2) > 0.;
+    // bool reversed = getJointReverse(joint);
+
+    // if ((sameDir && reversed) || (!sameDir && !reversed)) {
+    if (getJointReverse(joint)) {
+        Base::Rotation rot2 = plc2.getRotation();
+
+        // Define a 180-degree rotation around the X-axis
+        Base::Rotation flipRot(Base::Vector3d(1, 0, 0), M_PI);
+
+        // Combine the original rotation with the flipping rotation
+        rot2 = rot2 * flipRot;
+
+        plc2.setRotation(rot2);
+    }
+}
+
 bool AssemblyObject::jointUseOffset(JointType jointType)
 {
     // These are the joints needing the offset to be applied on freecad side.
     return (jointType == JointType::Fixed || jointType == JointType::Revolute);
+}
+
+bool AssemblyObject::jointUseRotation(JointType jointType)
+{
+    // These are the joints needing the offset to be applied on freecad side.
+    return (jointType == JointType::Fixed || jointType == JointType::Slider);
+}
+
+bool AssemblyObject::jointUseReverse(JointType jointType)
+{
+    // These are the joints needing the offset to be applied on freecad side.
+    return (jointType == JointType::Fixed || jointType == JointType::Revolute
+            || jointType == JointType::Cylindrical || jointType == JointType::Slider
+            || jointType == JointType::Distance);
 }
 
 void AssemblyObject::setNewPlacements()
@@ -715,8 +799,9 @@ void AssemblyObject::recomputeJointPlacements(std::vector<App::DocumentObject*> 
 
         Py::Object attr = jointPy.getAttr("updateJCSPlacements");
         if (attr.ptr() && attr.isCallable()) {
-            Py::Tuple args(1);
+            Py::Tuple args(2);
             args.setItem(0, Py::asObject(joint->getPyObject()));
+            args.setItem(1, Py::asObject(this->getPyObject()));
             Py::Callable(attr).apply(args);
         }
     }
@@ -784,6 +869,30 @@ double AssemblyObject::getJointOffset(App::DocumentObject* joint)
     }
 
     return offset;
+}
+
+double AssemblyObject::getJointRotation(App::DocumentObject* joint)
+{
+    double rotation = 0.0;
+
+    auto* prop = dynamic_cast<App::PropertyFloat*>(joint->getPropertyByName("Rotation"));
+    if (prop) {
+        rotation = Base::toRadians(prop->getValue());
+    }
+
+    return rotation;
+}
+
+double AssemblyObject::getJointReverse(App::DocumentObject* joint)
+{
+    bool reverse = false;
+
+    auto* prop = dynamic_cast<App::PropertyBool*>(joint->getPropertyByName("Reverse"));
+    if (prop) {
+        reverse = prop->getValue();
+    }
+
+    return reverse;
 }
 
 JointType AssemblyObject::getJointType(App::DocumentObject* joint)

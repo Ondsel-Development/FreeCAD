@@ -31,6 +31,7 @@ if App.GuiUp:
     from PySide import QtCore, QtGui, QtWidgets
 
 import UtilsAssembly
+import Preferences
 
 # translate = App.Qt.translate
 
@@ -82,6 +83,9 @@ class TaskAssemblyInsertLink(QtCore.QObject):
         self.form = Gui.PySideUic.loadUi(":/panels/TaskAssemblyInsertLink.ui")
         self.form.installEventFilter(self)
 
+        pref = Preferences.preferences()
+        self.form.CheckBox_InsertInParts.setChecked(pref.GetBool("InsertInParts", True))
+
         # Actions
         self.form.openFileButton.clicked.connect(self.openFiles)
         self.form.partList.itemClicked.connect(self.onItemClicked)
@@ -108,9 +112,12 @@ class TaskAssemblyInsertLink(QtCore.QObject):
         return True
 
     def deactivated(self):
+        pref = Preferences.preferences()
+        pref.SetBool("InsertInParts", self.form.CheckBox_InsertInParts.isChecked())
+
         if self.partMoving:
             self.endMove()
-            self.doc.removeObject(self.createdLink.Name)
+            self.doc.removeObject(self.addedObject.Name)
 
     def buildPartList(self):
         self.allParts.clear()
@@ -136,7 +143,7 @@ class TaskAssemblyInsertLink(QtCore.QObject):
                     self.allParts.append(obj)
                     self.partsDoc.append(doc)
 
-            for obj in doc.findObjects("PartDesign::Body"):
+            for obj in doc.findObjects("Part::Feature"):
                 # but only those at top level (not nested inside other containers)
                 if obj.getParentGeoFeatureGroup() is None:
                     self.allParts.append(obj)
@@ -145,7 +152,7 @@ class TaskAssemblyInsertLink(QtCore.QObject):
         self.form.partList.clear()
         for part in self.allParts:
             newItem = QtGui.QListWidgetItem()
-            newItem.setText(part.Document.Name + " - " + part.Name)
+            newItem.setText(part.Label + " (" + part.Document.Name + ".FCStd)")
             newItem.setIcon(part.ViewObject.Icon)
             self.form.partList.addItem(newItem)
 
@@ -193,19 +200,38 @@ class TaskAssemblyInsertLink(QtCore.QObject):
 
         # check that the current document had been saved or that it's the same document as that of the selected part
         if not self.doc.FileName != "" and not self.doc == selectedPart.Document:
-            print("The current document must be saved before inserting an external part")
-            return
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+            msgBox.setText("The current document must be saved before inserting external parts.")
+            msgBox.setWindowTitle("Save Document")
+            saveButton = msgBox.addButton("Save", QtWidgets.QMessageBox.AcceptRole)
+            cancelButton = msgBox.addButton("Cancel", QtWidgets.QMessageBox.RejectRole)
 
-        self.createdLink = self.assembly.newObject("App::Link", selectedPart.Name)
-        self.createdLink.LinkedObject = selectedPart
-        self.createdLink.Placement.Base = self.getTranslationVec(selectedPart)
-        self.createdLink.recompute()
+            msgBox.exec_()
+
+            if not (msgBox.clickedButton() == saveButton and Gui.ActiveDocument.saveAs()):
+                return
+
+        objectWhereToInsert = self.assembly
+
+        if self.form.CheckBox_InsertInParts.isChecked() and selectedPart.TypeId != "App::Part":
+            objectWhereToInsert = self.assembly.newObject("App::Part", "Part " + selectedPart.Name)
+
+        createdLink = objectWhereToInsert.newObject("App::Link", selectedPart.Name)
+        createdLink.LinkedObject = selectedPart
+        createdLink.recompute()
+
+        self.addedObject = createdLink
+        if self.form.CheckBox_InsertInParts.isChecked() and selectedPart.TypeId != "App::Part":
+            self.addedObject = objectWhereToInsert
+
+        self.addedObject.Placement.Base = self.getTranslationVec(selectedPart)
 
         self.numberOfAddedParts += 1
 
         # highlight the link
         Gui.Selection.clearSelection()
-        Gui.Selection.addSelection(self.doc.Name, self.assembly.Name, self.createdLink.Name + ".")
+        Gui.Selection.addSelection(self.doc.Name, self.addedObject.Name, "")
 
         # Start moving the part if user brings mouse on view
         self.initMove()
@@ -230,17 +256,21 @@ class TaskAssemblyInsertLink(QtCore.QObject):
 
     def moveMouse(self, info):
         newPos = self.view.getPoint(*info["Position"])
-        self.createdLink.Placement.Base = newPos
+        self.addedObject.Placement.Base = newPos
 
     def clickMouse(self, info):
         if info["Button"] == "BUTTON1" and info["State"] == "DOWN":
             if info["ShiftDown"]:
                 # Create a new link and moves this one now
-                currentPos = self.createdLink.Placement.Base
-                selectedPart = self.createdLink.LinkedObject
-                self.createdLink = self.assembly.newObject("App::Link", selectedPart.Name)
-                self.createdLink.LinkedObject = selectedPart
-                self.createdLink.Placement.Base = currentPos
+                currentPos = self.addedObject.Placement.Base
+                selectedPart = self.addedObject
+                if self.addedObject.TypeId == "App::Link":
+                    selectedPart = self.addedObject.LinkedObject
+
+                self.addedObject = self.assembly.newObject("App::Link", selectedPart.Name)
+                self.addedObject.LinkedObject = selectedPart
+                self.addedObject.Placement.Base = currentPos
+
             else:
                 self.endMove()
 
@@ -248,14 +278,14 @@ class TaskAssemblyInsertLink(QtCore.QObject):
     def KeyboardEvent(self, info):
         if info["State"] == "UP" and info["Key"] == "ESCAPE":
             self.endMove()
-            self.doc.removeObject(self.createdLink.Name)
+            self.doc.removeObject(self.addedObject.Name)
 
     # Taskbox keyboard event handler
     def eventFilter(self, watched, event):
         if watched == self.form and event.type() == QtCore.QEvent.KeyPress:
             if event.key() == QtCore.Qt.Key_Escape and self.partMoving:
                 self.endMove()
-                self.doc.removeObject(self.createdLink.Name)
+                self.doc.removeObject(self.addedObject.Name)
                 return True  # Consume the event
         return super().eventFilter(watched, event)
 

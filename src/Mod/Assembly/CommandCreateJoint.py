@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: LGPL-2.1-or-later
+﻿# SPDX-License-Identifier: LGPL-2.1-or-later
 # /****************************************************************************
 #                                                                           *
 #    Copyright (c) 2023 Ondsel <development@ondsel.com>                     *
@@ -43,7 +43,7 @@ __url__ = "https://www.freecad.org"
 
 
 def isCreateJointActive():
-    return UtilsAssembly.isAssemblyGrounded()
+    return UtilsAssembly.isAssemblyGrounded() and UtilsAssembly.assembly_has_at_least_n_parts(2)
 
 
 def activateJoint(index):
@@ -233,7 +233,10 @@ class CommandToggleGrounded:
         }
 
     def IsActive(self):
-        return UtilsAssembly.isAssemblyCommandActive()
+        return (
+            UtilsAssembly.isAssemblyCommandActive()
+            and UtilsAssembly.assembly_has_at_least_n_parts(1)
+        )
 
     def Activated(self):
         assembly = UtilsAssembly.activeAssembly()
@@ -254,20 +257,33 @@ class CommandToggleGrounded:
 
                 full_element_name = UtilsAssembly.getFullElementName(sel.ObjectName, sub)
                 obj = UtilsAssembly.getObject(full_element_name)
+                part_containing_obj = UtilsAssembly.getContainingPart(full_element_name, obj)
+
+                # Only objects within the assembly.
+                objs_names, element_name = UtilsAssembly.getObjsNamesAndElement(sel.ObjectName, sub)
+                if assembly.Name not in objs_names:
+                    continue
 
                 # Check if part is grounded and if so delete the joint.
                 for joint in joint_group.Group:
-                    if hasattr(joint, "ObjectToGround") and joint.ObjectToGround == obj:
+                    if (
+                        hasattr(joint, "ObjectToGround")
+                        and joint.ObjectToGround == part_containing_obj
+                    ):
+                        # Remove grounded tag.
+                        if part_containing_obj.Label.endswith(" 🔒"):
+                            part_containing_obj.Label = part_containing_obj.Label[:-2]
                         doc = App.ActiveDocument
                         doc.removeObject(joint.Name)
                         doc.recompute()
                         return
 
                 # Create groundedJoint.
+
+                part_containing_obj.Label = part_containing_obj.Label + " 🔒"
                 ground = joint_group.newObject("App::FeaturePython", "GroundedJoint")
-                JointObject.GroundedJoint(ground, obj)
+                JointObject.GroundedJoint(ground, part_containing_obj)
                 JointObject.ViewProviderGroundedJoint(ground.ViewObject)
-        Gui.Selection.clearSelection()
         App.closeActiveTransaction()
 
 

@@ -21,6 +21,19 @@
     <widget class="QListWidget" name="featureList"/>
    </item>
    <item row="2" column="0">
+    <widget class="QCheckBox" name="CheckBoxReverse">
+     <property name="toolTip">
+      <string>Reverse the direction of the joint.</string>
+     </property>
+     <property name="text">
+      <string>Reverse</string>
+     </property>
+     <property name="checked">
+      <bool>false</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
     <layout class="QHBoxLayout" name="hLayout">
      <item>
       <widget class="QLabel" name="offsetLabel">
@@ -39,6 +52,30 @@
        </property>
        <property name="unit" stdset="0">
         <string notr="true">mm</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="4" column="0">
+    <layout class="QHBoxLayout" name="hLayoutRotation">
+     <item>
+      <widget class="QLabel" name="rotationLabel">
+       <property name="text">
+        <string>Rotation</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="Gui::QuantitySpinBox" name="rotationSpinbox">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="unit" stdset="0">
+        <string notr="true">deg</string>
        </property>
       </widget>
      </item>
