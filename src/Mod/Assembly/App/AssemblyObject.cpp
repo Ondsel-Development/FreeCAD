@@ -138,8 +138,8 @@ void AssemblyObject::removeUnconnectedJoints(std::vector<App::DocumentObject*>& 
             joints.begin(),
             joints.end(),
             [&connectedParts, this](App::DocumentObject* joint) {
-                App::DocumentObject* obj1 = getLinkObjFromProp(joint, "Object1");
-                App::DocumentObject* obj2 = getLinkObjFromProp(joint, "Object2");
+                App::DocumentObject* obj1 = getLinkObjFromProp(joint, "Part1");
+                App::DocumentObject* obj2 = getLinkObjFromProp(joint, "Part2");
                 if ((connectedParts.find(obj1) == connectedParts.end())
                     || (connectedParts.find(obj2) == connectedParts.end())) {
                     Base::Console().Warning(
@@ -172,8 +172,8 @@ AssemblyObject::getConnectedParts(App::DocumentObject* part,
 {
     std::vector<App::DocumentObject*> connectedParts;
     for (auto joint : joints) {
-        App::DocumentObject* obj1 = getLinkObjFromProp(joint, "Object1");
-        App::DocumentObject* obj2 = getLinkObjFromProp(joint, "Object2");
+        App::DocumentObject* obj1 = getLinkObjFromProp(joint, "Part1");
+        App::DocumentObject* obj2 = getLinkObjFromProp(joint, "Part2");
         if (obj1 == part) {
             connectedParts.push_back(obj2);
         }
@@ -469,8 +469,8 @@ AssemblyObject::makeMbdJoint(App::DocumentObject* joint)
         return {};
     }
 
-    std::string fullMarkerName1 = handleOneSideOfJoint(joint, jointType, "Object1", "Placement1");
-    std::string fullMarkerName2 = handleOneSideOfJoint(joint, jointType, "Object2", "Placement2");
+    std::string fullMarkerName1 = handleOneSideOfJoint(joint, jointType, "Part1", "Placement1");
+    std::string fullMarkerName2 = handleOneSideOfJoint(joint, jointType, "Part2", "Placement2");
 
     mbdJoint->setMarkerI(fullMarkerName1);
     mbdJoint->setMarkerJ(fullMarkerName2);
@@ -619,6 +619,13 @@ void AssemblyObject::swapJCS(App::DocumentObject* joint)
         propObject1->setValue(propObject2->getValue());
         propObject2->setValue(temp);
     }
+    auto propPart1 = dynamic_cast<App::PropertyLink*>(joint->getPropertyByName("Part1"));
+    auto propPart2 = dynamic_cast<App::PropertyLink*>(joint->getPropertyByName("Part2"));
+    if (propPart1 && propPart2) {
+        auto temp = propPart1->getValue();
+        propPart1->setValue(propPart2->getValue());
+        propPart2->setValue(temp);
+    }
 }
 
 void AssemblyObject::applyOffsetToPlacement(Base::Placement& plc, App::DocumentObject* joint)
@@ -655,34 +662,35 @@ void AssemblyObject::setNewPlacements()
         // Check if the object has a "Placement" property
         auto* propPlacement =
             dynamic_cast<App::PropertyPlacement*>(obj->getPropertyByName("Placement"));
-        if (propPlacement) {
-
-            double x, y, z;
-            mbdPart->getPosition3D(x, y, z);
-            // Base::Console().Warning("in set placement : (%f, %f, %f)\n", x, y, z);
-            Base::Vector3d pos = Base::Vector3d(x, y, z);
-
-            // TODO : replace with quaternion to simplify
-            auto& r0 = mbdPart->rotationMatrix->at(0);
-            auto& r1 = mbdPart->rotationMatrix->at(1);
-            auto& r2 = mbdPart->rotationMatrix->at(2);
-            Base::Vector3d row0 = Base::Vector3d(r0->at(0), r0->at(1), r0->at(2));
-            Base::Vector3d row1 = Base::Vector3d(r1->at(0), r1->at(1), r1->at(2));
-            Base::Vector3d row2 = Base::Vector3d(r2->at(0), r2->at(1), r2->at(2));
-            Base::Matrix4D mat;
-            mat.setRow(0, row0);
-            mat.setRow(1, row1);
-            mat.setRow(2, row2);
-            Base::Rotation rot = Base::Rotation(mat);
-
-            /*double q0, q1, q2, q3;
-            mbdPart->getQuarternions(q0, q1, q2, q3);
-            Base::Rotation rot = Base::Rotation(q0, q1, q2, q3);*/
-
-            Base::Placement newPlacement = Base::Placement(pos, rot);
-
-            propPlacement->setValue(newPlacement);
+        if (!propPlacement) {
+            return;
         }
+
+        double x, y, z;
+        mbdPart->getPosition3D(x, y, z);
+        // Base::Console().Warning("in set placement : (%f, %f, %f)\n", x, y, z);
+        Base::Vector3d pos = Base::Vector3d(x, y, z);
+
+        // TODO : replace with quaternion to simplify
+        auto& r0 = mbdPart->rotationMatrix->at(0);
+        auto& r1 = mbdPart->rotationMatrix->at(1);
+        auto& r2 = mbdPart->rotationMatrix->at(2);
+        Base::Vector3d row0 = Base::Vector3d(r0->at(0), r0->at(1), r0->at(2));
+        Base::Vector3d row1 = Base::Vector3d(r1->at(0), r1->at(1), r1->at(2));
+        Base::Vector3d row2 = Base::Vector3d(r2->at(0), r2->at(1), r2->at(2));
+        Base::Matrix4D mat;
+        mat.setRow(0, row0);
+        mat.setRow(1, row1);
+        mat.setRow(2, row2);
+        Base::Rotation rot = Base::Rotation(mat);
+
+        /*double q0, q1, q2, q3;
+        mbdPart->getQuarternions(q0, q1, q2, q3);
+        Base::Rotation rot = Base::Rotation(q0, q1, q2, q3);*/
+
+        Base::Placement newPlacement = Base::Placement(pos, rot);
+
+        propPlacement->setValue(newPlacement);
     }
 }
 
