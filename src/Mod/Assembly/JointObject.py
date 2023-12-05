@@ -81,6 +81,13 @@ class Joint:
         )
 
         joint.addProperty(
+            "App::PropertyLink",
+            "Part1",
+            "Joint Connector 1",
+            QT_TRANSLATE_NOOP("App::Property", "The first part of the joint"),
+        )
+
+        joint.addProperty(
             "App::PropertyString",
             "Element1",
             "Joint Connector 1",
@@ -110,6 +117,13 @@ class Joint:
             "Object2",
             "Joint Connector 2",
             QT_TRANSLATE_NOOP("App::Property", "The second object of the joint"),
+        )
+
+        joint.addProperty(
+            "App::PropertyLink",
+            "Part2",
+            "Joint Connector 2",
+            QT_TRANSLATE_NOOP("App::Property", "The second part of the joint"),
         )
 
         joint.addProperty(
@@ -174,9 +188,12 @@ class Joint:
 
         if len(current_selection) >= 1:
             joint.Object1 = current_selection[0]["object"]
+            joint.Part1 = current_selection[0]["part"]
             joint.Element1 = current_selection[0]["element_name"]
             joint.Vertex1 = current_selection[0]["vertex_name"]
-            joint.Placement1 = self.findPlacement(joint.Object1, joint.Element1, joint.Vertex1)
+            joint.Placement1 = self.findPlacement(
+                joint.Object1, joint.Part1, joint.Element1, joint.Vertex1
+            )
         else:
             joint.Object1 = None
             joint.Element1 = ""
@@ -185,9 +202,12 @@ class Joint:
 
         if len(current_selection) >= 2:
             joint.Object2 = current_selection[1]["object"]
+            joint.Part2 = current_selection[1]["part"]
             joint.Element2 = current_selection[1]["element_name"]
             joint.Vertex2 = current_selection[1]["vertex_name"]
-            joint.Placement2 = self.findPlacement(joint.Object2, joint.Element2, joint.Vertex2)
+            joint.Placement2 = self.findPlacement(
+                joint.Object2, joint.Part2, joint.Element2, joint.Vertex2
+            )
         else:
             joint.Object2 = None
             joint.Element2 = ""
@@ -198,8 +218,12 @@ class Joint:
         joint.Offset = offset
 
     def updateJCSPlacements(self, joint):
-        joint.Placement1 = self.findPlacement(joint.Object1, joint.Element1, joint.Vertex1)
-        joint.Placement2 = self.findPlacement(joint.Object2, joint.Element2, joint.Vertex2)
+        joint.Placement1 = self.findPlacement(
+            joint.Object1, joint.Part1, joint.Element1, joint.Vertex1
+        )
+        joint.Placement2 = self.findPlacement(
+            joint.Object2, joint.Part2, joint.Element2, joint.Vertex2
+        )
 
     """
     So here we want to find a placement that corresponds to a local coordinate system that would be placed at the selected vertex.
@@ -211,7 +235,7 @@ class Joint:
     - if elt is a cylindrical face, vtx can also be the center of the arcs of the cylindrical face.
     """
 
-    def findPlacement(self, obj, elt, vtx):
+    def findPlacement(self, obj, part, elt, vtx):
         plc = App.Placement()
 
         if not obj or not elt or not vtx:
@@ -268,7 +292,19 @@ class Joint:
             if surface.TypeId == "Part::GeomPlane":
                 plc.Rotation = App.Rotation(surface.Rotation)
 
-        # Now plc is the placement in the doc. But we need the placement relative to the solid origin.
+        # Now plc is the placement relative to the origin determined by the object placement.
+        # But it does not take into account Part placements. So if the solid is in a part and
+        # if the part has a placement then plc is wrong.
+
+        obj_plc = obj.Placement
+        global_plc = UtilsAssembly.getGlobalPlacement(obj, part)
+
+        # change plc to be relative to the object placement.
+        plc = obj_plc.inverse() * plc
+
+        # change plc to be relative to the origin of the document.
+        plc = global_plc * plc
+
         return plc
 
 
@@ -598,9 +634,12 @@ class MakeJointSelGate:
         full_obj_name = ".".join(objs_names)
         full_element_name = full_obj_name + "." + element_name
         selected_object = UtilsAssembly.getObject(full_element_name)
+        part_containing_selected_object = UtilsAssembly.getContainingPart(
+            full_element_name, selected_object
+        )
 
         for selection_dict in self.taskbox.current_selection:
-            if selection_dict["object"] == selected_object:
+            if selection_dict["part"] == part_containing_selected_object:
                 # Can't join a solid to itself. So the user need to select 2 different parts.
                 return False
 
@@ -774,7 +813,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
     def moveMouse(self, info):
         if len(self.current_selection) >= 2 or (
             len(self.current_selection) == 1
-            and self.current_selection[0]["object"] == self.preselection_dict["object"]
+            and self.current_selection[0]["part"] == self.preselection_dict["part"]
         ):
             self.joint.ViewObject.Proxy.showPreviewJCS(False)
             return
@@ -802,6 +841,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
         placement = self.joint.Proxy.findPlacement(
             self.preselection_dict["object"],
+            self.preselection_dict["part"],
             self.preselection_dict["element_name"],
             self.preselection_dict["vertex_name"],
         )
@@ -822,9 +862,13 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         full_element_name = UtilsAssembly.getFullElementName(obj_name, sub_name)
         selected_object = UtilsAssembly.getObject(full_element_name)
         element_name = UtilsAssembly.getElementName(full_element_name)
+        part_containing_selected_object = UtilsAssembly.getContainingPart(
+            full_element_name, selected_object
+        )
 
         selection_dict = {
             "object": selected_object,
+            "part": part_containing_selected_object,
             "element_name": element_name,
             "full_element_name": full_element_name,
             "full_obj_name": full_obj_name,
@@ -839,11 +883,14 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         full_element_name = UtilsAssembly.getFullElementName(obj_name, sub_name)
         selected_object = UtilsAssembly.getObject(full_element_name)
         element_name = UtilsAssembly.getElementName(full_element_name)
+        part_containing_selected_object = UtilsAssembly.getContainingPart(
+            full_element_name, selected_object
+        )
 
         # Find and remove the corresponding dictionary from the combined list
         selection_dict_to_remove = None
         for selection_dict in self.current_selection:
-            if selection_dict["object"] == selected_object:
+            if selection_dict["part"] == part_containing_selected_object:
                 selection_dict_to_remove = selection_dict
                 break
 
@@ -861,9 +908,13 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         full_element_name = UtilsAssembly.getFullElementName(obj_name, sub_name)
         selected_object = UtilsAssembly.getObject(full_element_name)
         element_name = UtilsAssembly.getElementName(full_element_name)
+        part_containing_selected_object = UtilsAssembly.getContainingPart(
+            full_element_name, selected_object
+        )
 
         self.preselection_dict = {
             "object": selected_object,
+            "part": part_containing_selected_object,
             "sub_name": sub_name,
             "element_name": element_name,
             "full_element_name": full_element_name,

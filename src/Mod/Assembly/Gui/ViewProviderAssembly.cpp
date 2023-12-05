@@ -308,31 +308,48 @@ App::DocumentObject* ViewProviderAssembly::getObjectFromSubNames(std::vector<std
         // For example we want box in "box.face1"
         return appDoc->getObject(subNames[0].c_str());
     }
-    else {
-        objName = subNames[subNames.size() - 3];
 
+    // From here subnames is at least 3 and can be more. There are several cases to consider :
+    //  bodyOrLink.pad.face1                                    -> bodyOrLink should be the moving
+    //  entity partOrLink.bodyOrLink.pad.face1                         -> partOrLink should be the
+    //  moving entity partOrLink.box.face1                                    -> partOrLink should
+    //  be the moving entity partOrLink1...ParOrLinkn.bodyOrLink.pad.face1           -> partOrLink1
+    //  should be the moving entity assembly1.partOrLink1...ParOrLinkn.bodyOrLink.pad.face1 ->
+    //  partOrLink1 should be the moving entity assembly1.boxOrLink1.face1 -> boxOrLink1 should be
+    //  the moving entity
+
+    for (auto objName : subNames) {
         App::DocumentObject* obj = appDoc->getObject(objName.c_str());
         if (!obj) {
-            return nullptr;
+            continue;
         }
-        if (obj->getTypeId().isDerivedFrom(PartDesign::Body::getClassTypeId())) {
+
+        if (obj->getTypeId().isDerivedFrom(AssemblyObject::getClassTypeId())) {
+            continue;
+        }
+        else if (obj->getTypeId().isDerivedFrom(App::Part::getClassTypeId())
+                 || obj->getTypeId().isDerivedFrom(PartDesign::Body::getClassTypeId())) {
             return obj;
         }
         else if (obj->getTypeId().isDerivedFrom(App::Link::getClassTypeId())) {
-
             App::Link* link = dynamic_cast<App::Link*>(obj);
 
             App::DocumentObject* linkedObj = link->getLinkedObject(true);
+            if (!linkedObj) {
+                continue;
+            }
 
-            if (linkedObj->getTypeId().isDerivedFrom(PartDesign::Body::getClassTypeId())) {
+            if (linkedObj->getTypeId().isDerivedFrom(App::Part::getClassTypeId())
+                || linkedObj->getTypeId().isDerivedFrom(PartDesign::Body::getClassTypeId())) {
                 return obj;
             }
         }
-
-        // then its neither a body or a link to a body.
-        objName = subNames[subNames.size() - 2];
-        return appDoc->getObject(objName.c_str());
     }
+
+    // then its neither a part or body or a link to a part or body. So it is something like
+    // assembly.box.face1
+    objName = subNames[subNames.size() - 2];
+    return appDoc->getObject(objName.c_str());
 }
 
 void ViewProviderAssembly::initMove(Base::Vector3d& mousePosition)

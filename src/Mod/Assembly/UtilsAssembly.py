@@ -57,8 +57,8 @@ def isDocTemporary(doc):
 
 
 def getObject(full_name):
-    # full_name is "Assembly.Assembly1.Assembly2.Assembly3.Box.Edge16"
-    # or           "Assembly.Assembly1.Assembly2.Assembly3.Body.pad.Edge16"
+    # full_name is "Assembly.Assembly1.LinkOrPart1.Box.Edge16"
+    # or           "Assembly.Assembly1.LinkOrPart1.Body.pad.Edge16"
     # We want either Body or Box.
     parts = full_name.split(".")
     doc = App.ActiveDocument
@@ -80,8 +80,87 @@ def getObject(full_name):
         if linked_obj.TypeId == "PartDesign::Body":
             return obj
 
-    else:  # primitive, fastener, gear ... or link to primitive, fastener, gear...
-        return doc.getObject(parts[-2])
+    # primitive, fastener, gear ... or link to primitive, fastener, gear...
+    return doc.getObject(parts[-2])
+
+
+def getContainingPart(full_name, selected_object):
+    # full_name is "Assembly.Assembly1.LinkOrPart1.Box.Edge16"
+    # or           "Assembly.Assembly1.LinkOrPart1.Body.pad.Edge16"
+    # We want either Body or Box.
+    parts = full_name.split(".")
+    doc = App.ActiveDocument
+    if len(parts) < 3:
+        App.Console.PrintError(
+            "getContainingPart() in UtilsAssembly.py the object name is too short, at minimum it should be something like 'Assembly.Box.edge16'. It shouldn't be shorter"
+        )
+        return None
+
+    for objName in parts:
+        obj = doc.getObject(objName)
+
+        if not obj:
+            continue
+
+        # Note here we may want to specify a specific behavior for Assembly::AssemblyObject.
+        if obj.TypeId == "App::Part":
+            if obj.hasObject(selected_object, True):
+                return obj
+
+        elif obj.TypeId == "App::Link":
+            linked_obj = obj.getLinkedObject()
+            if linked_obj.TypeId == "App::Part":
+                if linked_obj.hasObject(selected_object, True):
+                    return obj
+
+    # no container found so we return the object itself.
+    return selected_object
+
+
+# The container is used to support cases where the same object appears at several places
+# which happens when you have a link to a part.
+def getGlobalPlacement(targetObj, container=None):
+    for part in App.activeDocument().RootObjects:
+        inContainerBranch = (part == container) or (container == None)
+        foundPlacement = getTargetPlacementRelativeTo(targetObj, part, container, inContainerBranch)
+        if foundPlacement is not None:
+            foundPlacement = part.Placement * foundPlacement
+            return foundPlacement
+
+    return App.Placement()
+
+
+def getTargetPlacementRelativeTo(targetObj, part, container, inContainerBranch):
+    if targetObj == part and inContainerBranch:
+        return targetObj.Placement
+
+    if part.TypeId == "App::Part" or part.TypeId == "Assembly::AssemblyObject":
+        for obj in part.OutList:
+            inContainerBranch = inContainerBranch or (obj == container)
+            foundPlacement = getTargetPlacementRelativeTo(
+                targetObj, obj, container, inContainerBranch
+            )
+            if foundPlacement is None:
+                continue
+
+            foundPlacement = part.Placement * foundPlacement
+            return foundPlacement
+
+    if part.TypeId == "App::Link":
+        linked_obj = part.getLinkedObject()
+        if linked_obj.TypeId == "App::Part" or linked_obj.TypeId == "Assembly::AssemblyObject":
+            for obj in linked_obj.OutList:
+                inContainerBranch = inContainerBranch or (obj == container)
+                foundPlacement = getTargetPlacementRelativeTo(
+                    targetObj, obj, container, inContainerBranch
+                )
+                if foundPlacement is None:
+                    continue
+
+                foundPlacement = part.Placement * foundPlacement
+                return foundPlacement
+
+    return None
 
 
 def getElementName(full_name):
