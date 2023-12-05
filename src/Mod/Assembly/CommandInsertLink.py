@@ -59,7 +59,7 @@ class CommandInsertLink:
         }
 
     def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
+        return UtilsAssembly.isAssemblyCommandActive()
 
     def Activated(self):
         assembly = UtilsAssembly.activeAssembly()
