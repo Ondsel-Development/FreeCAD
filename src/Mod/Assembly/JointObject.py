@@ -646,9 +646,15 @@ class MakeJointSelGate:
         return True
 
 
+activeTask = None
+
+
 class TaskAssemblyCreateJoint(QtCore.QObject):
     def __init__(self, jointTypeIndex, jointObj=None):
         super().__init__()
+
+        global activeTask
+        activeTask = self
 
         self.assembly = UtilsAssembly.activeAssembly()
         self.view = Gui.activeDocument().activeView()
@@ -717,6 +723,9 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         return True
 
     def deactivate(self):
+        global activeTask
+        activeTask = None
+
         self.assembly.ViewObject.EnableMovement = True
         Gui.Selection.removeSelectionGate()
         Gui.Selection.removeObserver(self)

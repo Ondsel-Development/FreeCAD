@@ -47,6 +47,10 @@ def activeAssembly():
     return None
 
 
+def isAssemblyCommandActive():
+    return activeAssembly() is not None and not Gui.Control.activeDialog()
+
+
 def isDocTemporary(doc):
     # Guard against older versions of FreeCad which don't have the Temporary attribute
     try:

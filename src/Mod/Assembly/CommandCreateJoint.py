@@ -46,6 +46,14 @@ def isCreateJointActive():
     return UtilsAssembly.isAssemblyGrounded()
 
 
+def activateJoint(index):
+    if JointObject.activeTask:
+        JointObject.activeTask.reject()
+
+    panel = TaskAssemblyCreateJoint(index)
+    Gui.Control.showDialog(panel)
+
+
 class CommandCreateJointFixed:
     def __init__(self):
         pass
@@ -69,8 +77,7 @@ class CommandCreateJointFixed:
         return isCreateJointActive()
 
     def Activated(self):
-        panel = TaskAssemblyCreateJoint(0)
-        Gui.Control.showDialog(panel)
+        activateJoint(0)
 
 
 class CommandCreateJointRevolute:
@@ -96,8 +103,7 @@ class CommandCreateJointRevolute:
         return isCreateJointActive()
 
     def Activated(self):
-        panel = TaskAssemblyCreateJoint(1)
-        Gui.Control.showDialog(panel)
+        activateJoint(1)
 
 
 class CommandCreateJointCylindrical:
@@ -125,8 +131,7 @@ class CommandCreateJointCylindrical:
         return isCreateJointActive()
 
     def Activated(self):
-        panel = TaskAssemblyCreateJoint(2)
-        Gui.Control.showDialog(panel)
+        activateJoint(2)
 
 
 class CommandCreateJointSlider:
@@ -152,8 +157,7 @@ class CommandCreateJointSlider:
         return isCreateJointActive()
 
     def Activated(self):
-        panel = TaskAssemblyCreateJoint(3)
-        Gui.Control.showDialog(panel)
+        activateJoint(3)
 
 
 class CommandCreateJointBall:
@@ -179,8 +183,7 @@ class CommandCreateJointBall:
         return isCreateJointActive()
 
     def Activated(self):
-        panel = TaskAssemblyCreateJoint(4)
-        Gui.Control.showDialog(panel)
+        activateJoint(4)
 
 
 class CommandCreateJointDistance:
@@ -207,8 +210,7 @@ class CommandCreateJointDistance:
         # return isCreateJointActive()
 
     def Activated(self):
-        panel = TaskAssemblyCreateJoint(5)
-        Gui.Control.showDialog(panel)
+        activateJoint(5)
 
 
 class CommandToggleGrounded:
@@ -231,7 +233,7 @@ class CommandToggleGrounded:
         }
 
     def IsActive(self):
-        return UtilsAssembly.activeAssembly() is not None
+        return UtilsAssembly.isAssemblyCommandActive()
 
     def Activated(self):
         assembly = UtilsAssembly.activeAssembly()
