@@ -142,6 +142,12 @@ class TaskAssemblyInsertLink(QtCore.QObject):
                     self.allParts.append(obj)
                     self.partsDoc.append(doc)
 
+            for obj in doc.findObjects("Part::Feature"):
+                # but only those at top level (not nested inside other containers)
+                if obj.getParentGeoFeatureGroup() is None:
+                    self.allParts.append(obj)
+                    self.partsDoc.append(doc)
+
         self.form.partList.clear()
         for part in self.allParts:
             newItem = QtGui.QListWidgetItem()
@@ -193,10 +199,24 @@ class TaskAssemblyInsertLink(QtCore.QObject):
 
         # check that the current document had been saved or that it's the same document as that of the selected part
         if not self.doc.FileName != "" and not self.doc == selectedPart.Document:
-            print("The current document must be saved before inserting an external part")
-            return
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+            msgBox.setText("The current document must be saved before inserting external parts.")
+            msgBox.setWindowTitle("Save Document")
+            saveButton = msgBox.addButton("Save", QtWidgets.QMessageBox.AcceptRole)
+            cancelButton = msgBox.addButton("Cancel", QtWidgets.QMessageBox.RejectRole)
 
-        self.createdLink = self.assembly.newObject("App::Link", selectedPart.Name)
+            msgBox.exec_()
+
+            if not (msgBox.clickedButton() == saveButton and Gui.ActiveDocument.saveAs()):
+                return
+
+        objectWhereToInsert = self.assembly
+
+        if self.form.CheckBox_InsertInParts.isChecked() and selectedPart.TypeId != "App::Part":
+            objectWhereToInsert = self.assembly.newObject("App::Part", "Part " + selectedPart.Name)
+
+        self.createdLink = objectWhereToInsert.newObject("App::Link", selectedPart.Name)
         self.createdLink.LinkedObject = selectedPart
         self.createdLink.Placement.Base = self.getTranslationVec(selectedPart)
         self.createdLink.recompute()

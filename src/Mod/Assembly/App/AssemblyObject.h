@@ -97,10 +97,11 @@ public:
                                      JointType jointType,
                                      const char* propObjLinkName,
                                      const char* propPlcName);
-    void fixGroundedPart(App::DocumentObject* obj, Base::Placement& plc, std::string& jointName);
-    std::vector<App::DocumentObject*> fixGroundedParts();
     void jointParts(std::vector<App::DocumentObject*> joints);
     std::vector<App::DocumentObject*> getJoints();
+    std::vector<App::DocumentObject*> getGroundedJoints();
+    void fixGroundedPart(App::DocumentObject* obj, Base::Placement& plc, std::string& jointName);
+    std::vector<App::DocumentObject*> fixGroundedParts();
 
     void removeUnconnectedJoints(std::vector<App::DocumentObject*>& joints,
                                  std::vector<App::DocumentObject*> groundedObjs);

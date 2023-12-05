@@ -117,6 +117,31 @@ std::vector<App::DocumentObject*> AssemblyObject::getJoints()
     return joints;
 }
 
+std::vector<App::DocumentObject*> AssemblyObject::getGroundedJoints()
+{
+    std::vector<App::DocumentObject*> joints = {};
+
+    JointGroup* jointGroup = getJointGroup();
+    if (!jointGroup) {
+        return {};
+    }
+
+    Base::PyGILStateLocker lock;
+    for (auto obj : jointGroup->getObjects()) {
+        if (!obj) {
+            continue;
+        }
+
+        auto* propObj = dynamic_cast<App::PropertyLink*>(obj->getPropertyByName("ObjectToGround"));
+
+        if (propObj) {
+            joints.push_back(obj);
+        }
+    }
+
+    return joints;
+}
+
 void AssemblyObject::removeUnconnectedJoints(std::vector<App::DocumentObject*>& joints,
                                              std::vector<App::DocumentObject*> groundedObjs)
 {
@@ -203,15 +228,10 @@ JointGroup* AssemblyObject::getJointGroup()
 
 std::vector<App::DocumentObject*> AssemblyObject::fixGroundedParts()
 {
-    JointGroup* jointGroup = getJointGroup();
-    if (!jointGroup) {
-        return {};
-    }
+    std::vector<App::DocumentObject*> groundedJoints = getGroundedJoints();
 
     std::vector<App::DocumentObject*> groundedObjs;
-
-    Base::PyGILStateLocker lock;
-    for (auto obj : jointGroup->getObjects()) {
+    for (auto obj : groundedJoints) {
         if (!obj) {
             continue;
         }
@@ -715,8 +735,9 @@ void AssemblyObject::recomputeJointPlacements(std::vector<App::DocumentObject*> 
 
         Py::Object attr = jointPy.getAttr("updateJCSPlacements");
         if (attr.ptr() && attr.isCallable()) {
-            Py::Tuple args(1);
+            Py::Tuple args(2);
             args.setItem(0, Py::asObject(joint->getPyObject()));
+            args.setItem(1, Py::asObject(this->getPyObject()));
             Py::Callable(attr).apply(args);
         }
     }

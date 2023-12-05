@@ -60,19 +60,33 @@ def isDocTemporary(doc):
     return temp
 
 
+def assembly_has_at_least_n_parts(n):
+    assembly = activeAssembly()
+    i = 0
+    if not assembly:
+        return False
+    for obj in assembly.OutList:
+        # note : groundedJoints comes in the outlist so we filter those out.
+        if hasattr(obj, "Placement") and not hasattr(obj, "ObjectToGround"):
+            i = i + 1
+            if i == n:
+                return True
+    return False
+
+
 def getObject(full_name):
     # full_name is "Assembly.Assembly1.LinkOrPart1.Box.Edge16"
     # or           "Assembly.Assembly1.LinkOrPart1.Body.pad.Edge16"
     # We want either Body or Box.
-    parts = full_name.split(".")
+    names = full_name.split(".")
     doc = App.ActiveDocument
-    if len(parts) < 3:
+    if len(names) < 3:
         App.Console.PrintError(
             "getObject() in UtilsAssembly.py the object name is too short, at minimum it should be something like 'Assembly.Box.edge16'. It shouldn't be shorter"
         )
         return None
 
-    obj = doc.getObject(parts[-3])  # So either 'Body', or 'Assembly'
+    obj = doc.getObject(names[-3])  # So either 'Body', or 'Assembly'
 
     if not obj:
         return None
@@ -85,22 +99,22 @@ def getObject(full_name):
             return obj
 
     # primitive, fastener, gear ... or link to primitive, fastener, gear...
-    return doc.getObject(parts[-2])
+    return doc.getObject(names[-2])
 
 
 def getContainingPart(full_name, selected_object):
     # full_name is "Assembly.Assembly1.LinkOrPart1.Box.Edge16"
     # or           "Assembly.Assembly1.LinkOrPart1.Body.pad.Edge16"
     # We want either Body or Box.
-    parts = full_name.split(".")
+    names = full_name.split(".")
     doc = App.ActiveDocument
-    if len(parts) < 3:
+    if len(names) < 3:
         App.Console.PrintError(
             "getContainingPart() in UtilsAssembly.py the object name is too short, at minimum it should be something like 'Assembly.Box.edge16'. It shouldn't be shorter"
         )
         return None
 
-    for objName in parts:
+    for objName in names:
         obj = doc.getObject(objName)
 
         if not obj:
@@ -124,37 +138,50 @@ def getContainingPart(full_name, selected_object):
 # The container is used to support cases where the same object appears at several places
 # which happens when you have a link to a part.
 def getGlobalPlacement(targetObj, container=None):
+    inContainerBranch = container is None
     for part in App.activeDocument().RootObjects:
-        inContainerBranch = (part == container) or (container == None)
         foundPlacement = getTargetPlacementRelativeTo(targetObj, part, container, inContainerBranch)
         if foundPlacement is not None:
-            foundPlacement = part.Placement * foundPlacement
             return foundPlacement
 
     return App.Placement()
 
 
-def getTargetPlacementRelativeTo(targetObj, part, container, inContainerBranch):
-    if targetObj == part and inContainerBranch:
+def getTargetPlacementRelativeTo(
+    targetObj, part, container, inContainerBranch, ignorePlacement=False
+):
+    inContainerBranch = inContainerBranch or (not ignorePlacement and part == container)
+
+    if targetObj == part and inContainerBranch and not ignorePlacement:
         return targetObj.Placement
 
-    if part.TypeId == "App::Part" or part.TypeId == "Assembly::AssemblyObject":
+    if part.TypeId == "App::DocumentObjectGroup":
         for obj in part.OutList:
-            inContainerBranch = inContainerBranch or (obj == container)
+            foundPlacement = getTargetPlacementRelativeTo(
+                targetObj, obj, container, inContainerBranch, ignorePlacement
+            )
+            if foundPlacement is not None:
+                return foundPlacement
+
+    elif part.TypeId == "App::Part" or part.TypeId == "Assembly::AssemblyObject":
+        for obj in part.OutList:
             foundPlacement = getTargetPlacementRelativeTo(
                 targetObj, obj, container, inContainerBranch
             )
             if foundPlacement is None:
                 continue
 
-            foundPlacement = part.Placement * foundPlacement
+            # If we were called from a link then we need to ignore this placement as we use the link placement instead.
+            if not ignorePlacement:
+                foundPlacement = part.Placement * foundPlacement
+
             return foundPlacement
 
-    if part.TypeId == "App::Link":
+    elif part.TypeId == "App::Link":
         linked_obj = part.getLinkedObject()
+
         if linked_obj.TypeId == "App::Part" or linked_obj.TypeId == "Assembly::AssemblyObject":
             for obj in linked_obj.OutList:
-                inContainerBranch = inContainerBranch or (obj == container)
                 foundPlacement = getTargetPlacementRelativeTo(
                     targetObj, obj, container, inContainerBranch
                 )
@@ -163,6 +190,15 @@ def getTargetPlacementRelativeTo(targetObj, part, container, inContainerBranch):
 
                 foundPlacement = part.Placement * foundPlacement
                 return foundPlacement
+
+        foundPlacement = getTargetPlacementRelativeTo(
+            targetObj, linked_obj, container, inContainerBranch, True
+        )
+
+        if foundPlacement is not None and not ignorePlacement:
+            foundPlacement = part.Placement * foundPlacement
+
+        return foundPlacement
 
     return None
 
@@ -230,14 +266,25 @@ def extract_type_and_number(element_name):
 
 
 def findElementClosestVertex(selection_dict):
+    obj = selection_dict["object"]
+
+    mousePos = selection_dict["mouse_pos"]
+
+    # We need mousePos to be relative to the part containing obj global placement
+    if selection_dict["object"] != selection_dict["part"]:
+        plc = App.Placement()
+        plc.Base = mousePos
+        global_plc = getGlobalPlacement(selection_dict["part"])
+        plc = global_plc.inverse() * plc
+        mousePos = plc.Base
+
     elt_type, elt_index = extract_type_and_number(selection_dict["element_name"])
 
     if elt_type == "Vertex":
         return selection_dict["element_name"]
 
     elif elt_type == "Edge":
-        edge = selection_dict["object"].Shape.Edges[elt_index - 1]
-
+        edge = obj.Shape.Edges[elt_index - 1]
         curve = edge.Curve
         if curve.TypeId == "Part::GeomCircle":
             # For centers, as they are not shape vertexes, we return the element name.
@@ -245,17 +292,24 @@ def findElementClosestVertex(selection_dict):
             return selection_dict["element_name"]
 
         edge_points = getPointsFromVertexes(edge.Vertexes)
-        closest_vertex_index, _ = findClosestPointToMousePos(
-            edge_points, selection_dict["mouse_pos"]
-        )
-        vertex_name = findVertexNameInObject(
-            edge.Vertexes[closest_vertex_index], selection_dict["object"]
-        )
+
+        if curve.TypeId == "Part::GeomLine":
+            # For lines we allow users to select the middle of lines as well.
+            line_middle = (edge_points[0] + edge_points[1]) * 0.5
+            edge_points.append(line_middle)
+
+        closest_vertex_index, _ = findClosestPointToMousePos(edge_points, mousePos)
+
+        if curve.TypeId == "Part::GeomLine" and closest_vertex_index == 2:
+            # If line center is closest then we have no vertex name to set so we put element name
+            return selection_dict["element_name"]
+
+        vertex_name = findVertexNameInObject(edge.Vertexes[closest_vertex_index], obj)
 
         return vertex_name
 
     elif elt_type == "Face":
-        face = selection_dict["object"].Shape.Faces[elt_index - 1]
+        face = obj.Shape.Faces[elt_index - 1]
 
         # Handle the circle/arc edges for their centers
         center_points = []
@@ -270,13 +324,17 @@ def findElementClosestVertex(selection_dict):
 
         if len(center_points) > 0:
             closest_center_index, closest_center_distance = findClosestPointToMousePos(
-                center_points, selection_dict["mouse_pos"]
+                center_points, mousePos
             )
 
-        # Hendle the face vertexes
+        # Handle the face vertexes
         face_points = getPointsFromVertexes(face.Vertexes)
+
+        # We also allow users to select the center of gravity.
+        face_points.append(face.CenterOfGravity)
+
         closest_vertex_index, closest_vertex_distance = findClosestPointToMousePos(
-            face_points, selection_dict["mouse_pos"]
+            face_points, mousePos
         )
 
         if len(center_points) > 0:
@@ -285,9 +343,11 @@ def findElementClosestVertex(selection_dict):
                 index = center_points_edge_indexes[closest_center_index] + 1
                 return "Edge" + str(index)
 
-        vertex_name = findVertexNameInObject(
-            face.Vertexes[closest_vertex_index], selection_dict["object"]
-        )
+        if closest_vertex_index == len(face.Vertexes):
+            # If center of gravity then we have no vertex name to set so we put element name
+            return selection_dict["element_name"]
+
+        vertex_name = findVertexNameInObject(face.Vertexes[closest_vertex_index], obj)
 
         return vertex_name
 
@@ -330,10 +390,16 @@ def color_from_unsigned(c):
 
 
 def getJointGroup(assembly):
-    joint_group = assembly.getObject("Joints")
+    joint_group = None
+
+    for obj in assembly.OutList:
+        if obj.TypeId == "Assembly::JointGroup":
+            joint_group = obj
+            break
 
     if not joint_group:
         joint_group = assembly.newObject("Assembly::JointGroup", "Joints")
+
     return joint_group
 
 

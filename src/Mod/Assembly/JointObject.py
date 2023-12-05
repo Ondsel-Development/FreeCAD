@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: LGPL-2.1-or-later
+﻿# SPDX-License-Identifier: LGPL-2.1-or-later
 # /****************************************************************************
 #                                                                           *
 #    Copyright (c) 2023 Ondsel <development@ondsel.com>                     *
@@ -58,7 +58,7 @@ JointUsingOffset = [
 
 
 class Joint:
-    def __init__(self, joint, type_index):
+    def __init__(self, joint, type_index, assembly):
         self.Type = "Joint"
 
         joint.Proxy = self
@@ -160,7 +160,7 @@ class Joint:
             ),
         )
 
-        self.setJointConnectors(joint, [])
+        self.setJointConnectors(joint, [], assembly)
 
     def __getstate__(self):
         return self.Type
@@ -183,7 +183,7 @@ class Joint:
         # App.Console.PrintMessage("Recompute Python Box feature\n")
         pass
 
-    def setJointConnectors(self, joint, current_selection):
+    def setJointConnectors(self, joint, current_selection, assembly):
         # current selection is a vector of strings like "Assembly.Assembly1.Assembly2.Body.Pad.Edge16" including both what selection return as obj_name and obj_sub
 
         if len(current_selection) >= 1:
@@ -192,7 +192,7 @@ class Joint:
             joint.Element1 = current_selection[0]["element_name"]
             joint.Vertex1 = current_selection[0]["vertex_name"]
             joint.Placement1 = self.findPlacement(
-                joint.Object1, joint.Part1, joint.Element1, joint.Vertex1
+                joint.Object1, joint.Part1, joint.Element1, joint.Vertex1, assembly
             )
         else:
             joint.Object1 = None
@@ -206,7 +206,7 @@ class Joint:
             joint.Element2 = current_selection[1]["element_name"]
             joint.Vertex2 = current_selection[1]["vertex_name"]
             joint.Placement2 = self.findPlacement(
-                joint.Object2, joint.Part2, joint.Element2, joint.Vertex2
+                joint.Object2, joint.Part2, joint.Element2, joint.Vertex2, assembly
             )
         else:
             joint.Object2 = None
@@ -217,12 +217,12 @@ class Joint:
     def setJointOffset(self, joint, offset):
         joint.Offset = offset
 
-    def updateJCSPlacements(self, joint):
+    def updateJCSPlacements(self, joint, assembly):
         joint.Placement1 = self.findPlacement(
-            joint.Object1, joint.Part1, joint.Element1, joint.Vertex1
+            joint.Object1, joint.Part1, joint.Element1, joint.Vertex1, assembly
         )
         joint.Placement2 = self.findPlacement(
-            joint.Object2, joint.Part2, joint.Element2, joint.Vertex2
+            joint.Object2, joint.Part2, joint.Element2, joint.Vertex2, assembly
         )
 
     """
@@ -235,11 +235,14 @@ class Joint:
     - if elt is a cylindrical face, vtx can also be the center of the arcs of the cylindrical face.
     """
 
-    def findPlacement(self, obj, part, elt, vtx):
+    def findPlacement(self, obj, part, elt, vtx, assembly):
         plc = App.Placement()
 
-        if not obj or not elt or not vtx:
+        if not obj:
             return App.Placement()
+
+        if not elt or not vtx:
+            return obj.Placement
 
         elt_type, elt_index = UtilsAssembly.extract_type_and_number(elt)
         vtx_type, vtx_index = UtilsAssembly.extract_type_and_number(vtx)
@@ -253,10 +256,14 @@ class Joint:
 
             # First we find the translation
             if vtx_type == "Edge":
-                # In this case the edge is a circle/arc and the wanted vertex is its center.
+                # In this case the wanted vertex is the center.
                 if curve.TypeId == "Part::GeomCircle":
                     center_point = curve.Location
                     plc.Base = (center_point.x, center_point.y, center_point.z)
+                elif curve.TypeId == "Part::GeomLine":
+                    edge_points = UtilsAssembly.getPointsFromVertexes(edge.Vertexes)
+                    line_middle = (edge_points[0] + edge_points[1]) * 0.5
+                    plc.Base = line_middle
             else:
                 vertex = obj.Shape.Vertexes[vtx_index - 1]
                 plc.Base = (vertex.X, vertex.Y, vertex.Z)
@@ -282,7 +289,9 @@ class Joint:
                 if curve.TypeId == "Part::GeomCircle":
                     center_point = curve.Location
                     plc.Base = (center_point.x, center_point.y, center_point.z)
-
+            elif vtx_type == "Face":
+                # In this case it is the center of gravity of the face
+                plc.Base = face.CenterOfGravity
             else:
                 vertex = obj.Shape.Vertexes[vtx_index - 1]
                 plc.Base = (vertex.X, vertex.Y, vertex.Z)
@@ -296,14 +305,16 @@ class Joint:
         # But it does not take into account Part placements. So if the solid is in a part and
         # if the part has a placement then plc is wrong.
 
-        obj_plc = obj.Placement
         global_plc = UtilsAssembly.getGlobalPlacement(obj, part)
 
         # change plc to be relative to the object placement.
-        plc = obj_plc.inverse() * plc
+        plc = obj.Placement.inverse() * plc
 
         # change plc to be relative to the origin of the document.
         plc = global_plc * plc
+
+        # change plc to be relative to the assembly.
+        plc = assembly.Placement.inverse() * plc
 
         return plc
 
@@ -604,6 +615,15 @@ class ViewProviderGroundedJoint:
         # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
         pass
 
+    def onDelete(self, feature, subelements):  # subelements is a tuple of strings
+        # Remove grounded tag.
+        if hasattr(feature.Object, "ObjectToGround"):
+            obj = feature.Object.ObjectToGround
+            if obj.Label.endswith(" 🔒"):
+                obj.Label = obj.Label[:-2]
+
+        return True  # If False is returned the object won't be deleted
+
     def getIcon(self):
         return ":/icons/Assembly_ToggleGrounded.svg"
 
@@ -619,8 +639,8 @@ class MakeJointSelGate:
 
         objs_names, element_name = UtilsAssembly.getObjsNamesAndElement(obj.Name, sub)
 
-        if self.assembly.Name not in objs_names or element_name == "":
-            # Only objects within the assembly. And not whole objects, only elements.
+        if self.assembly.Name not in objs_names:
+            # Only objects within the assembly.
             return False
 
         if Gui.Selection.isSelected(obj, sub, Gui.Selection.ResolveMode.NoResolve):
@@ -742,7 +762,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         joint_group = UtilsAssembly.getJointGroup(self.assembly)
 
         self.joint = joint_group.newObject("App::FeaturePython", self.jointName)
-        Joint(self.joint, type_index)
+        Joint(self.joint, type_index, self.assembly)
         ViewProviderJoint(self.joint.ViewObject)
 
     def onJointTypeChanged(self, index):
@@ -808,14 +828,16 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.updateJointList()
 
         # Then we pass the new list to the join object
-        self.joint.Proxy.setJointConnectors(self.joint, self.current_selection)
+        self.joint.Proxy.setJointConnectors(self.joint, self.current_selection, self.assembly)
 
     def updateJointList(self):
         self.form.featureList.clear()
         simplified_names = []
         for sel in self.current_selection:
             # TODO: ideally we probably want to hide the feature name in case of PartDesign bodies. ie body.face12 and not body.pad2.face12
-            sname = sel["object"].Label + "." + sel["element_name"]
+            sname = sel["object"].Label
+            if sel["element_name"] != "":
+                sname = sname + "." + sel["element_name"]
             simplified_names.append(sname)
         self.form.featureList.addItems(simplified_names)
 
@@ -844,15 +866,19 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         newPos = App.Vector(cursor_info["x"], cursor_info["y"], cursor_info["z"])
         self.preselection_dict["mouse_pos"] = newPos
 
-        self.preselection_dict["vertex_name"] = UtilsAssembly.findElementClosestVertex(
-            self.preselection_dict
-        )
+        if self.preselection_dict["element_name"] == "":
+            self.preselection_dict["vertex_name"] = ""
+        else:
+            self.preselection_dict["vertex_name"] = UtilsAssembly.findElementClosestVertex(
+                self.preselection_dict
+            )
 
         placement = self.joint.Proxy.findPlacement(
             self.preselection_dict["object"],
             self.preselection_dict["part"],
             self.preselection_dict["element_name"],
             self.preselection_dict["vertex_name"],
+            self.assembly,
         )
         self.joint.ViewObject.Proxy.showPreviewJCS(True, placement)
         self.previewJCSVisible = True
@@ -883,7 +909,10 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
             "full_obj_name": full_obj_name,
             "mouse_pos": App.Vector(mousePos[0], mousePos[1], mousePos[2]),
         }
-        selection_dict["vertex_name"] = UtilsAssembly.findElementClosestVertex(selection_dict)
+        if element_name == "":
+            selection_dict["vertex_name"] = ""
+        else:
+            selection_dict["vertex_name"] = UtilsAssembly.findElementClosestVertex(selection_dict)
 
         self.current_selection.append(selection_dict)
         self.updateJoint()

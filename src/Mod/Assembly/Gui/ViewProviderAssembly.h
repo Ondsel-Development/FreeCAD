@@ -24,6 +24,8 @@
 #ifndef ASSEMBLYGUI_VIEWPROVIDER_ViewProviderAssembly_H
 #define ASSEMBLYGUI_VIEWPROVIDER_ViewProviderAssembly_H
 
+#include <QCoreApplication>
+
 #include <Mod/Assembly/AssemblyGlobal.h>
 
 #include <Gui/Selection.h>
@@ -40,6 +42,7 @@ namespace AssemblyGui
 class AssemblyGuiExport ViewProviderAssembly: public Gui::ViewProviderPart,
                                               public Gui::SelectionObserver
 {
+    Q_DECLARE_TR_FUNCTIONS(AssemblyGui::ViewProviderAssembly)
     PROPERTY_HEADER_WITH_OVERRIDE(AssemblyGui::ViewProviderAssembly);
 
 public:
@@ -62,6 +65,8 @@ public:
     {
         return true;
     }
+
+    bool canDragObject(App::DocumentObject*) const override;
 
     App::DocumentObject* getActivePart();
 
