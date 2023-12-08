@@ -259,6 +259,11 @@ class CommandToggleGrounded:
                 obj = UtilsAssembly.getObject(full_element_name)
                 part_containing_obj = UtilsAssembly.getContainingPart(full_element_name, obj)
 
+                # Only objects within the assembly.
+                objs_names, element_name = UtilsAssembly.getObjsNamesAndElement(sel.ObjectName, sub)
+                if assembly.Name not in objs_names:
+                    continue
+
                 # Check if part is grounded and if so delete the joint.
                 for joint in joint_group.Group:
                     if (

@@ -93,6 +93,8 @@ public:
     std::shared_ptr<MbD::ASMTJoint> makeMbdJointOfType(App::DocumentObject* joint,
                                                        JointType jointType);
     bool jointUseOffset(JointType jointType);
+    bool jointUseRotation(JointType jointType);
+    bool jointUseReverse(JointType jointType);
     std::string handleOneSideOfJoint(App::DocumentObject* joint,
                                      JointType jointType,
                                      const char* propObjLinkName,
@@ -116,6 +118,8 @@ public:
     void swapJCS(App::DocumentObject* joint);
 
     void applyOffsetToPlacement(Base::Placement& plc, App::DocumentObject* joint);
+    void applyRotationToPlacement(Base::Placement& plc, App::DocumentObject* joint);
+    void applyReverseToPlacement(Base::Placement& plc, App::DocumentObject* joint);
     void setNewPlacements();
     void recomputeJointPlacements(std::vector<App::DocumentObject*> joints);
 
@@ -127,6 +131,8 @@ public:
 
     // getters to get from properties
     double getJointOffset(App::DocumentObject* joint);
+    double getJointRotation(App::DocumentObject* joint);
+    double getJointReverse(App::DocumentObject* joint);
     JointType getJointType(App::DocumentObject* joint);
     const char* getElementFromProp(App::DocumentObject* obj, const char* propName);
     std::string getElementTypeFromProp(App::DocumentObject* obj, const char* propName);

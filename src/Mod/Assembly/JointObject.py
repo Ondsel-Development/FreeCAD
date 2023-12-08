@@ -56,6 +56,19 @@ JointUsingOffset = [
     QT_TRANSLATE_NOOP("AssemblyJoint", "Distance"),
 ]
 
+JointUsingRotation = [
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Fixed"),
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Slider"),
+]
+
+JointUsingReverse = [
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Fixed"),
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Revolute"),
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Cylindrical"),
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Slider"),
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Distance"),
+]
+
 
 class Joint:
     def __init__(self, joint, type_index, assembly):
@@ -152,11 +165,31 @@ class Joint:
 
         joint.addProperty(
             "App::PropertyFloat",
+            "Rotation",
+            "Joint",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "This is the rotation of the joint.",
+            ),
+        )
+
+        joint.addProperty(
+            "App::PropertyFloat",
             "Offset",
             "Joint",
             QT_TRANSLATE_NOOP(
                 "App::Property",
                 "This is the offset of the joint.",
+            ),
+        )
+
+        joint.addProperty(
+            "App::PropertyBool",
+            "Reverse",
+            "Joint",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "This indicate if the joint connection is reversed.",
             ),
         )
 
@@ -213,9 +246,6 @@ class Joint:
             joint.Element2 = ""
             joint.Vertex2 = ""
             joint.Placement2 = UtilsAssembly.activeAssembly().Placement
-
-    def setJointOffset(self, joint, offset):
-        joint.Offset = offset
 
     def updateJCSPlacements(self, joint, assembly):
         joint.Placement1 = self.findPlacement(
@@ -691,6 +721,8 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.form.jointType.setCurrentIndex(jointTypeIndex)
         self.form.jointType.currentIndexChanged.connect(self.onJointTypeChanged)
         self.form.offsetSpinbox.valueChanged.connect(self.onOffsetChanged)
+        self.form.rotationSpinbox.valueChanged.connect(self.onRotationChanged)
+        self.form.CheckBoxReverse.stateChanged.connect(self.onReverseChanged)
 
         Gui.Selection.clearSelection()
 
@@ -711,6 +743,8 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
             self.createJointObject()
 
         self.toggleOffsetVisibility()
+        self.toggleRotationVisibility()
+        self.toggleReverseVisibility()
 
         Gui.Selection.addSelectionGate(
             MakeJointSelGate(self, self.assembly), Gui.Selection.ResolveMode.NoResolve
@@ -768,9 +802,17 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
     def onJointTypeChanged(self, index):
         self.joint.Proxy.setJointType(self.joint, self.form.jointType.currentText())
         self.toggleOffsetVisibility()
+        self.toggleRotationVisibility()
+        self.toggleReverseVisibility()
 
     def onOffsetChanged(self, quantity):
-        self.joint.Proxy.setJointOffset(self.joint, self.form.offsetSpinbox.property("rawValue"))
+        self.joint.Offset = self.form.offsetSpinbox.property("rawValue")
+
+    def onRotationChanged(self, quantity):
+        self.joint.Rotation = self.form.rotationSpinbox.property("rawValue")
+
+    def onReverseChanged(self, val):
+        self.joint.Reverse = self.form.CheckBoxReverse.isChecked()
 
     def toggleOffsetVisibility(self):
         if self.form.jointType.currentText() in JointUsingOffset:
@@ -779,6 +821,20 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         else:
             self.form.offsetLabel.hide()
             self.form.offsetSpinbox.hide()
+
+    def toggleRotationVisibility(self):
+        if self.form.jointType.currentText() in JointUsingRotation:
+            self.form.rotationLabel.show()
+            self.form.rotationSpinbox.show()
+        else:
+            self.form.rotationLabel.hide()
+            self.form.rotationSpinbox.hide()
+
+    def toggleReverseVisibility(self):
+        if self.form.jointType.currentText() in JointUsingReverse:
+            self.form.CheckBoxReverse.show()
+        else:
+            self.form.CheckBoxReverse.hide()
 
     def updateTaskboxFromJoint(self):
         self.current_selection = []
@@ -809,6 +865,10 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         Gui.Selection.addSelection(self.doc.Name, self.joint.Object2.Name, elName)
 
         self.form.offsetSpinbox.setProperty("rawValue", self.joint.Offset)
+        self.form.rotationSpinbox.setProperty("rawValue", self.joint.Rotation)
+        self.form.CheckBoxReverse.setChecked(self.joint.Reverse)
+
+        self.form.jointType.setCurrentIndex(JointTypes.index(self.joint.JointType))
         self.updateJointList()
 
     def getObjSubNameFromObj(self, obj, elName):
