@@ -21,6 +21,7 @@
 #                                                                           *
 # ***************************************************************************/
 
+import re
 import os
 import FreeCAD as App
 
@@ -45,17 +46,25 @@ class CommandInsertLink:
         pass
 
     def GetResources(self):
-        tooltip = "<p>Insert a Link into the assembly. "
-        tooltip += "This will create dynamic links to parts/bodies/primitives/assemblies."
-        tooltip += "To insert external objects, make sure that the file "
-        tooltip += "is <b>open in the current session</b></p>"
-        tooltip += "<p>Press shift to add several links while clicking on the view."
-
         return {
             "Pixmap": "Assembly_InsertLink",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_InsertLink", "Insert Link"),
             "Accel": "I",
-            "ToolTip": QT_TRANSLATE_NOOP("Assembly_InsertLink", tooltip),
+            "ToolTip": "<p>"
+            + QT_TRANSLATE_NOOP(
+                "Assembly_InsertLink",
+                "Insert a Link into the currently active assembly. This will create dynamic links to parts/bodies/primitives/assemblies. To insert external objects, make sure that the file is <b>open in the current session</b>",
+            )
+            + "</p><p><ul><li>"
+            + QT_TRANSLATE_NOOP("Assembly_InsertLink", "Insert by left clicking items in the list.")
+            + "</li><li>"
+            + QT_TRANSLATE_NOOP("Assembly_InsertLink", "Undo by right clicking items in the list.")
+            + "</li><li>"
+            + QT_TRANSLATE_NOOP(
+                "Assembly_InsertLink",
+                "Press shift to add several links while clicking on the view.",
+            )
+            + "</li></ul></p>",
             "CmdType": "ForEdit",
         }
 
@@ -82,6 +91,7 @@ class TaskAssemblyInsertLink(QtCore.QObject):
 
         self.form = Gui.PySideUic.loadUi(":/panels/TaskAssemblyInsertLink.ui")
         self.form.installEventFilter(self)
+        self.form.partList.installEventFilter(self)
 
         pref = Preferences.preferences()
         self.form.CheckBox_InsertInParts.setChecked(pref.GetBool("InsertInParts", True))
@@ -93,9 +103,11 @@ class TaskAssemblyInsertLink(QtCore.QObject):
 
         self.allParts = []
         self.partsDoc = []
-        self.numberOfAddedParts = 0
         self.translation = 0
         self.partMoving = False
+        self.totalTranslation = App.Vector()
+
+        self.insertionStack = []  # used to handle cancellation of insertions.
 
         self.buildPartList()
 
@@ -116,8 +128,7 @@ class TaskAssemblyInsertLink(QtCore.QObject):
         pref.SetBool("InsertInParts", self.form.CheckBox_InsertInParts.isChecked())
 
         if self.partMoving:
-            self.endMove()
-            self.doc.removeObject(self.addedObject.Name)
+            self.dismissPart()
 
     def buildPartList(self):
         self.allParts.clear()
@@ -221,20 +232,60 @@ class TaskAssemblyInsertLink(QtCore.QObject):
         createdLink.LinkedObject = selectedPart
         createdLink.recompute()
 
-        self.addedObject = createdLink
+        addedObject = createdLink
         if self.form.CheckBox_InsertInParts.isChecked() and selectedPart.TypeId != "App::Part":
-            self.addedObject = objectWhereToInsert
+            addedObject = objectWhereToInsert
 
-        self.addedObject.Placement.Base = self.getTranslationVec(selectedPart)
+        insertionDict = {}
+        insertionDict["item"] = item
+        insertionDict["addedObject"] = addedObject
+        self.insertionStack.append(insertionDict)
+        self.increment_counter(item)
 
-        self.numberOfAddedParts += 1
+        translation = self.getTranslationVec(addedObject)
+        insertionDict["translation"] = translation
+        self.totalTranslation += translation
+        addedObject.Placement.Base = self.totalTranslation
 
         # highlight the link
         Gui.Selection.clearSelection()
-        Gui.Selection.addSelection(self.doc.Name, self.addedObject.Name, "")
+        Gui.Selection.addSelection(self.doc.Name, addedObject.Name, "")
 
         # Start moving the part if user brings mouse on view
         self.initMove()
+
+        self.form.partList.setItemSelected(item, False)
+
+    def increment_counter(self, item):
+        text = item.text()
+        match = re.search(r"(\d+) inserted$", text)
+
+        if match:
+            # Counter exists, increment it
+            counter = int(match.group(1)) + 1
+            new_text = re.sub(r"\d+ inserted$", f"{counter} inserted", text)
+        else:
+            # Counter does not exist, add it
+            new_text = f"{text} : 1 inserted"
+
+        item.setText(new_text)
+
+    def decrement_counter(self, item):
+        text = item.text()
+        match = re.search(r"(\d+) inserted$", text)
+
+        if match:
+            counter = int(match.group(1)) - 1
+            if counter > 0:
+                # Update the counter
+                new_text = re.sub(r"\d+ inserted$", f"{counter} inserted", text)
+            elif counter == 0:
+                # Remove the counter part from the text
+                new_text = re.sub(r" : \d+ inserted$", "", text)
+            else:
+                return
+
+            item.setText(new_text)
 
     def initMove(self):
         self.callbackMove = self.view.addEventCallback("SoLocation2Event", self.moveMouse)
@@ -256,46 +307,82 @@ class TaskAssemblyInsertLink(QtCore.QObject):
 
     def moveMouse(self, info):
         newPos = self.view.getPoint(*info["Position"])
-        self.addedObject.Placement.Base = newPos
+        self.insertionStack[-1]["addedObject"].Placement.Base = newPos
 
     def clickMouse(self, info):
         if info["Button"] == "BUTTON1" and info["State"] == "DOWN":
             if info["ShiftDown"]:
                 # Create a new link and moves this one now
-                currentPos = self.addedObject.Placement.Base
-                selectedPart = self.addedObject
-                if self.addedObject.TypeId == "App::Link":
-                    selectedPart = self.addedObject.LinkedObject
+                addedObject = self.insertionStack[-1]["addedObject"]
+                currentPos = addedObject.Placement.Base
+                selectedPart = addedObject
+                if addedObject.TypeId == "App::Link":
+                    selectedPart = addedObject.LinkedObject
 
-                self.addedObject = self.assembly.newObject("App::Link", selectedPart.Name)
-                self.addedObject.LinkedObject = selectedPart
-                self.addedObject.Placement.Base = currentPos
+                addedObject = self.assembly.newObject("App::Link", selectedPart.Name)
+                addedObject.LinkedObject = selectedPart
+                addedObject.Placement.Base = currentPos
+
+                insertionDict = {}
+                insertionDict["translation"] = App.Vector()
+                insertionDict["item"] = self.insertionStack[-1]["item"]
+                insertionDict["addedObject"] = addedObject
+                self.insertionStack.append(insertionDict)
 
             else:
                 self.endMove()
 
+        elif info["Button"] == "BUTTON2" and info["State"] == "DOWN":
+            self.dismissPart()
+
     # 3D view keyboard handler
     def KeyboardEvent(self, info):
         if info["State"] == "UP" and info["Key"] == "ESCAPE":
-            self.endMove()
-            self.doc.removeObject(self.addedObject.Name)
+            self.dismissPart()
+
+    def dismissPart(self):
+        self.endMove()
+        stack_item = self.insertionStack.pop()
+        self.totalTranslation -= stack_item["translation"]
+        UtilsAssembly.removeObjAndChilds(stack_item["addedObject"])
+        self.decrement_counter(stack_item["item"])
 
     # Taskbox keyboard event handler
     def eventFilter(self, watched, event):
         if watched == self.form and event.type() == QtCore.QEvent.KeyPress:
             if event.key() == QtCore.Qt.Key_Escape and self.partMoving:
-                self.endMove()
-                self.doc.removeObject(self.addedObject.Name)
+                self.dismissPart()
                 return True  # Consume the event
+
+        if event.type() == QtCore.QEvent.ContextMenu and watched is self.form.partList:
+            item = watched.itemAt(event.pos())
+
+            if item:
+                # Iterate through the insertionStack in reverse
+                for i in reversed(range(len(self.insertionStack))):
+                    stack_item = self.insertionStack[i]
+
+                    if stack_item["item"] == item:
+                        if self.partMoving:
+                            self.endMove()
+
+                        self.totalTranslation -= stack_item["translation"]
+                        UtilsAssembly.removeObjAndChilds(stack_item["addedObject"])
+                        self.decrement_counter(item)
+                        del self.insertionStack[i]
+                        self.form.partList.setItemSelected(item, False)
+
+                        return True
+
         return super().eventFilter(watched, event)
 
     def getTranslationVec(self, part):
         bb = part.Shape.BoundBox
         if bb:
-            self.translation += (bb.XMax + bb.YMax + bb.ZMax) * 0.15
+            translation = (bb.XMax + bb.YMax + bb.ZMax) * 0.15
         else:
-            self.translation += 10
-        return App.Vector(self.translation, self.translation, self.translation)
+            translation = 10
+        return App.Vector(translation, translation, translation)
 
 
 if App.GuiUp:

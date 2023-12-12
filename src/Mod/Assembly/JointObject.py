@@ -1,4 +1,4 @@
-﻿# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # /****************************************************************************
 #                                                                           *
 #    Copyright (c) 2023 Ondsel <development@ondsel.com>                     *
@@ -50,10 +50,13 @@ JointTypes = [
     QT_TRANSLATE_NOOP("AssemblyJoint", "Distance"),
 ]
 
+JointUsingDistance = [
+    QT_TRANSLATE_NOOP("AssemblyJoint", "Distance"),
+]
+
 JointUsingOffset = [
     QT_TRANSLATE_NOOP("AssemblyJoint", "Fixed"),
     QT_TRANSLATE_NOOP("AssemblyJoint", "Revolute"),
-    QT_TRANSLATE_NOOP("AssemblyJoint", "Distance"),
 ]
 
 JointUsingRotation = [
@@ -68,6 +71,14 @@ JointUsingReverse = [
     QT_TRANSLATE_NOOP("AssemblyJoint", "Slider"),
     QT_TRANSLATE_NOOP("AssemblyJoint", "Distance"),
 ]
+
+
+def flipPlacement(plc):
+    rot = plc.Rotation
+    flipRot = App.Rotation(App.Vector(1, 0, 0), 180)
+    rot = rot.multiply(flipRot)
+    plc.Rotation = rot
+    return plc
 
 
 class Joint:
@@ -165,6 +176,16 @@ class Joint:
 
         joint.addProperty(
             "App::PropertyFloat",
+            "Distance",
+            "Joint",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "This is the distance of the joint. It is used only by the distance joint.",
+            ),
+        )
+
+        joint.addProperty(
+            "App::PropertyFloat",
             "Rotation",
             "Joint",
             QT_TRANSLATE_NOOP(
@@ -174,26 +195,26 @@ class Joint:
         )
 
         joint.addProperty(
-            "App::PropertyFloat",
+            "App::PropertyVector",
             "Offset",
             "Joint",
             QT_TRANSLATE_NOOP(
                 "App::Property",
-                "This is the offset of the joint.",
+                "This is the offset vector of the joint.",
             ),
         )
 
         joint.addProperty(
             "App::PropertyBool",
-            "Reverse",
+            "FirstPartConnected",
             "Joint",
             QT_TRANSLATE_NOOP(
                 "App::Property",
-                "This indicate if the joint connection is reversed.",
+                "This indicate if the first part was connected to ground at the time of joint creation.",
             ),
         )
 
-        self.setJointConnectors(joint, [], assembly)
+        self.setJointConnectors(joint, [])
 
     def __getstate__(self):
         return self.Type
@@ -202,36 +223,46 @@ class Joint:
         if state:
             self.Type = state
 
+    def getAssembly(self, joint):
+        return joint.InList[0]
+
     def setJointType(self, joint, jointType):
         joint.JointType = jointType
         joint.Label = jointType.replace(" ", "")
 
-    def onChanged(self, fp, prop):
+    def onChanged(self, joint, prop):
         """Do something when a property has changed"""
         # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
-        pass
+
+        if prop == "Rotation" or prop == "Offset" or prop == "Distance":
+            self.getAssembly(joint).solve()
 
     def execute(self, fp):
         """Do something when doing a recomputation, this method is mandatory"""
         # App.Console.PrintMessage("Recompute Python Box feature\n")
         pass
 
-    def setJointConnectors(self, joint, current_selection, assembly):
+    def setJointConnectors(self, joint, current_selection):
         # current selection is a vector of strings like "Assembly.Assembly1.Assembly2.Body.Pad.Edge16" including both what selection return as obj_name and obj_sub
+        assembly = self.getAssembly(joint)
 
         if len(current_selection) >= 1:
+            joint.Part1 = None
+            joint.FirstPartConnected = assembly.isPartConnected(current_selection[0]["part"])
+
             joint.Object1 = current_selection[0]["object"]
             joint.Part1 = current_selection[0]["part"]
             joint.Element1 = current_selection[0]["element_name"]
             joint.Vertex1 = current_selection[0]["vertex_name"]
             joint.Placement1 = self.findPlacement(
-                joint.Object1, joint.Part1, joint.Element1, joint.Vertex1, assembly
+                joint, joint.Object1, joint.Part1, joint.Element1, joint.Vertex1
             )
         else:
             joint.Object1 = None
+            joint.Part1 = None
             joint.Element1 = ""
             joint.Vertex1 = ""
-            joint.Placement1 = UtilsAssembly.activeAssembly().Placement
+            joint.Placement1 = App.Placement()
 
         if len(current_selection) >= 2:
             joint.Object2 = current_selection[1]["object"]
@@ -239,20 +270,24 @@ class Joint:
             joint.Element2 = current_selection[1]["element_name"]
             joint.Vertex2 = current_selection[1]["vertex_name"]
             joint.Placement2 = self.findPlacement(
-                joint.Object2, joint.Part2, joint.Element2, joint.Vertex2, assembly
+                joint, joint.Object2, joint.Part2, joint.Element2, joint.Vertex2, True
             )
+            assembly.solve(True)
+
         else:
             joint.Object2 = None
+            joint.Part2 = None
             joint.Element2 = ""
             joint.Vertex2 = ""
-            joint.Placement2 = UtilsAssembly.activeAssembly().Placement
+            joint.Placement2 = App.Placement()
+            assembly.undoSolve()
 
-    def updateJCSPlacements(self, joint, assembly):
+    def updateJCSPlacements(self, joint):
         joint.Placement1 = self.findPlacement(
-            joint.Object1, joint.Part1, joint.Element1, joint.Vertex1, assembly
+            joint, joint.Object1, joint.Part1, joint.Element1, joint.Vertex1
         )
         joint.Placement2 = self.findPlacement(
-            joint.Object2, joint.Part2, joint.Element2, joint.Vertex2, assembly
+            joint, joint.Object2, joint.Part2, joint.Element2, joint.Vertex2, True
         )
 
     """
@@ -265,14 +300,18 @@ class Joint:
     - if elt is a cylindrical face, vtx can also be the center of the arcs of the cylindrical face.
     """
 
-    def findPlacement(self, obj, part, elt, vtx, assembly):
+    def findPlacement(self, joint, obj, part, elt, vtx, isSecond=False):
+        assembly = self.getAssembly(joint)
         plc = App.Placement()
 
         if not obj:
             return App.Placement()
 
         if not elt or not vtx:
-            return obj.Placement
+            # case of whole parts such as PartDesign::Body or PartDesign::CordinateSystem.
+            plc = UtilsAssembly.getGlobalPlacement(obj, part)
+            plc = assembly.Placement.inverse() * plc
+            return plc
 
         elt_type, elt_index = UtilsAssembly.extract_type_and_number(elt)
         vtx_type, vtx_index = UtilsAssembly.extract_type_and_number(vtx)
@@ -285,7 +324,7 @@ class Joint:
             curve = edge.Curve
 
             # First we find the translation
-            if vtx_type == "Edge":
+            if vtx_type == "Edge" or joint.JointType == "Distance":
                 # In this case the wanted vertex is the center.
                 if curve.TypeId == "Part::GeomCircle":
                     center_point = curve.Location
@@ -307,46 +346,78 @@ class Joint:
                 plane_origin = App.Vector(0, 0, 0)
                 plane = Part.Plane(plane_origin, plane_normal)
                 plc.Rotation = App.Rotation(plane.Rotation)
-
         elif elt_type == "Face":
             face = obj.Shape.Faces[elt_index - 1]
+            surface = face.Surface
 
             # First we find the translation
-            if vtx_type == "Edge":
+            if vtx_type == "Face" or joint.JointType == "Distance":
+                if (
+                    surface.TypeId == "Part::GeomCylinder"
+                    or surface.TypeId == "Part::GeomCone"
+                    or surface.TypeId == "Part::GeomTorus"
+                    or surface.TypeId == "Part::GeomSphere"
+                ):
+                    plc.Base = surface.Center
+                else:
+                    plc.Base = face.CenterOfGravity
+            elif vtx_type == "Edge":
                 # In this case the edge is a circle/arc and the wanted vertex is its center.
                 circleOrArc = face.Edges[vtx_index - 1]
                 curve = circleOrArc.Curve
                 if curve.TypeId == "Part::GeomCircle":
                     center_point = curve.Location
                     plc.Base = (center_point.x, center_point.y, center_point.z)
-            elif vtx_type == "Face":
-                # In this case it is the center of gravity of the face
-                plc.Base = face.CenterOfGravity
             else:
                 vertex = obj.Shape.Vertexes[vtx_index - 1]
                 plc.Base = (vertex.X, vertex.Y, vertex.Z)
 
             # Then we find the Rotation
-            surface = face.Surface
             if surface.TypeId == "Part::GeomPlane":
                 plc.Rotation = App.Rotation(surface.Rotation)
+            else:
+                plc.Rotation = surface.Rotation
 
         # Now plc is the placement relative to the origin determined by the object placement.
         # But it does not take into account Part placements. So if the solid is in a part and
         # if the part has a placement then plc is wrong.
 
-        global_plc = UtilsAssembly.getGlobalPlacement(obj, part)
-
         # change plc to be relative to the object placement.
         plc = obj.Placement.inverse() * plc
 
         # change plc to be relative to the origin of the document.
+        global_plc = UtilsAssembly.getGlobalPlacement(obj, part)
         plc = global_plc * plc
 
         # change plc to be relative to the assembly.
         plc = assembly.Placement.inverse() * plc
 
+        # We apply rotation / reverse / offset it necessary, but only to the second JCS.
+        if isSecond:
+            if joint.Offset.Length != 0.0:
+                plc = self.applyOffsetToPlacement(plc, joint.Offset)
+            if joint.Rotation != 0.0:
+                plc = self.applyRotationToPlacement(plc, joint.Rotation)
+
         return plc
+
+    def applyOffsetToPlacement(self, plc, offset):
+        plc.Base = plc.Base + offset
+        return plc
+
+    def applyRotationToPlacement(self, plc, angle):
+        rot = plc.Rotation
+        zRotation = App.Rotation(App.Vector(0, 0, 1), angle)
+        rot = rot.multiply(zRotation)
+        plc.Rotation = rot
+        return plc
+
+    def flipPart(self, joint):
+        if joint.FirstPartConnected:
+            joint.Part2.Placement = flipPlacement(joint.Part2.Placement)
+        else:
+            joint.Part1.Placement = flipPlacement(joint.Part1.Placement)
+        self.getAssembly(joint).solve()
 
 
 class ViewProviderJoint:
@@ -488,24 +559,33 @@ class ViewProviderJoint:
         r = placement.Rotation.Q
         soTransform.rotation.setValue(r[0], r[1], r[2], r[3])
 
-    def updateData(self, fp, prop):
+    def updateData(self, joint, prop):
         """If a property of the handled feature has changed we have the chance to handle this here"""
-        # fp is the handled feature, prop is the name of the property that has changed
+        # joint is the handled feature, prop is the name of the property that has changed
         if prop == "Placement1":
-            plc = fp.getPropertyByName("Placement1")
-            if fp.getPropertyByName("Object1"):
+            plc = joint.getPropertyByName("Placement1")
+            if joint.getPropertyByName("Object1"):
                 self.switch_JCS1.whichChild = coin.SO_SWITCH_ALL
                 self.set_JCS_placement(self.transform1, plc)
             else:
                 self.switch_JCS1.whichChild = coin.SO_SWITCH_NONE
 
         if prop == "Placement2":
-            plc = fp.getPropertyByName("Placement2")
-            if fp.getPropertyByName("Object2"):
+            plc = joint.getPropertyByName("Placement2")
+            if joint.getPropertyByName("Object2"):
                 self.switch_JCS2.whichChild = coin.SO_SWITCH_ALL
+                if self.areJCSReversed(joint):
+                    plc = flipPlacement(plc)
                 self.set_JCS_placement(self.transform2, plc)
             else:
                 self.switch_JCS2.whichChild = coin.SO_SWITCH_NONE
+
+    def areJCSReversed(self, joint):
+        zaxis1 = joint.Placement1.Rotation.multVec(App.Vector(0, 0, 1))
+        zaxis2 = joint.Placement2.Rotation.multVec(App.Vector(0, 0, 1))
+
+        sameDir = zaxis1.dot(zaxis2) > 0
+        return not sameDir
 
     def showPreviewJCS(self, visible, placement=None):
         if visible:
@@ -720,9 +800,10 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.form.jointType.addItems(JointTypes)
         self.form.jointType.setCurrentIndex(jointTypeIndex)
         self.form.jointType.currentIndexChanged.connect(self.onJointTypeChanged)
+        self.form.distanceSpinbox.valueChanged.connect(self.onDistanceChanged)
         self.form.offsetSpinbox.valueChanged.connect(self.onOffsetChanged)
         self.form.rotationSpinbox.valueChanged.connect(self.onRotationChanged)
-        self.form.CheckBoxReverse.stateChanged.connect(self.onReverseChanged)
+        self.form.PushButtonReverse.clicked.connect(self.onReverseClicked)
 
         Gui.Selection.clearSelection()
 
@@ -742,6 +823,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
             self.createJointObject()
 
+        self.toggleDistanceVisibility()
         self.toggleOffsetVisibility()
         self.toggleRotationVisibility()
         self.toggleReverseVisibility()
@@ -779,6 +861,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
     def deactivate(self):
         global activeTask
         activeTask = None
+        self.assembly.clearUndo()
 
         self.assembly.ViewObject.EnableMovement = True
         Gui.Selection.removeSelectionGate()
@@ -801,18 +884,30 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
     def onJointTypeChanged(self, index):
         self.joint.Proxy.setJointType(self.joint, self.form.jointType.currentText())
+        self.toggleDistanceVisibility()
         self.toggleOffsetVisibility()
         self.toggleRotationVisibility()
         self.toggleReverseVisibility()
 
+    def onDistanceChanged(self, quantity):
+        self.joint.Distance = self.form.distanceSpinbox.property("rawValue")
+
     def onOffsetChanged(self, quantity):
-        self.joint.Offset = self.form.offsetSpinbox.property("rawValue")
+        self.joint.Offset = App.Vector(0, 0, self.form.offsetSpinbox.property("rawValue"))
 
     def onRotationChanged(self, quantity):
         self.joint.Rotation = self.form.rotationSpinbox.property("rawValue")
 
-    def onReverseChanged(self, val):
-        self.joint.Reverse = self.form.CheckBoxReverse.isChecked()
+    def onReverseClicked(self):
+        self.joint.Proxy.flipPart(self.joint)
+
+    def toggleDistanceVisibility(self):
+        if self.form.jointType.currentText() in JointUsingDistance:
+            self.form.distanceLabel.show()
+            self.form.distanceSpinbox.show()
+        else:
+            self.form.distanceLabel.hide()
+            self.form.distanceSpinbox.hide()
 
     def toggleOffsetVisibility(self):
         if self.form.jointType.currentText() in JointUsingOffset:
@@ -832,9 +927,9 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
     def toggleReverseVisibility(self):
         if self.form.jointType.currentText() in JointUsingReverse:
-            self.form.CheckBoxReverse.show()
+            self.form.PushButtonReverse.show()
         else:
-            self.form.CheckBoxReverse.hide()
+            self.form.PushButtonReverse.hide()
 
     def updateTaskboxFromJoint(self):
         self.current_selection = []
@@ -842,12 +937,14 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
         selection_dict1 = {
             "object": self.joint.Object1,
+            "part": self.joint.Part1,
             "element_name": self.joint.Element1,
             "vertex_name": self.joint.Vertex1,
         }
 
         selection_dict2 = {
             "object": self.joint.Object2,
+            "part": self.joint.Part2,
             "element_name": self.joint.Element2,
             "vertex_name": self.joint.Vertex2,
         }
@@ -864,9 +961,9 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         elName = self.getObjSubNameFromObj(self.joint.Object2, self.joint.Element2)
         Gui.Selection.addSelection(self.doc.Name, self.joint.Object2.Name, elName)
 
-        self.form.offsetSpinbox.setProperty("rawValue", self.joint.Offset)
+        self.form.distanceSpinbox.setProperty("rawValue", self.joint.Distance)
+        self.form.offsetSpinbox.setProperty("rawValue", self.joint.Offset.z)
         self.form.rotationSpinbox.setProperty("rawValue", self.joint.Rotation)
-        self.form.CheckBoxReverse.setChecked(self.joint.Reverse)
 
         self.form.jointType.setCurrentIndex(JointTypes.index(self.joint.JointType))
         self.updateJointList()
@@ -888,7 +985,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.updateJointList()
 
         # Then we pass the new list to the join object
-        self.joint.Proxy.setJointConnectors(self.joint, self.current_selection, self.assembly)
+        self.joint.Proxy.setJointConnectors(self.joint, self.current_selection)
 
     def updateJointList(self):
         self.form.featureList.clear()
@@ -933,12 +1030,15 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
                 self.preselection_dict
             )
 
+        isSecond = len(self.current_selection) == 1
+
         placement = self.joint.Proxy.findPlacement(
+            self.joint,
             self.preselection_dict["object"],
             self.preselection_dict["part"],
             self.preselection_dict["element_name"],
             self.preselection_dict["vertex_name"],
-            self.assembly,
+            isSecond,
         )
         self.joint.ViewObject.Proxy.showPreviewJCS(True, placement)
         self.previewJCSVisible = True

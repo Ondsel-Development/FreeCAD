@@ -49,7 +49,7 @@ class CommandSolveAssembly:
         return {
             "Pixmap": "Assembly_SolveAssembly",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_SolveAssembly", "Solve Assembly"),
-            "Accel": "F",
+            "Accel": "Z",
             "ToolTip": "<p>"
             + QT_TRANSLATE_NOOP(
                 "Assembly_SolveAssembly",

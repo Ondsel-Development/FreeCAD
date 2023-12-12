@@ -1,4 +1,4 @@
-﻿# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # /****************************************************************************
 #                                                                           *
 #    Copyright (c) 2023 Ondsel <development@ondsel.com>                     *
@@ -63,7 +63,7 @@ class CommandCreateJointFixed:
         return {
             "Pixmap": "Assembly_CreateJointFixed",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_CreateJointFixed", "Create Fixed Joint"),
-            "Accel": "F",
+            "Accel": "J",
             "ToolTip": "<p>"
             + QT_TRANSLATE_NOOP(
                 "Assembly_CreateJointFixed",
@@ -206,8 +206,8 @@ class CommandCreateJointDistance:
         }
 
     def IsActive(self):
-        return False
-        # return isCreateJointActive()
+        # return False
+        return isCreateJointActive()
 
     def Activated(self):
         activateJoint(5)
@@ -222,11 +222,11 @@ class CommandToggleGrounded:
         return {
             "Pixmap": "Assembly_ToggleGrounded",
             "MenuText": QT_TRANSLATE_NOOP("Assembly_ToggleGrounded", "Toggle grounded"),
-            "Accel": "F",
+            "Accel": "G",
             "ToolTip": "<p>"
             + QT_TRANSLATE_NOOP(
                 "Assembly_ToggleGrounded",
-                "Toggle the grounded state of a part. Grounding a part permanently locks its position in the assembly, preventing any movement or rotation. You need at least one grounded part per assembly.",
+                "Grounding a part permanently locks its position in the assembly, preventing any movement or rotation. You need at least one grounded part before starting to assemble.",
             )
             + "</p>",
             "CmdType": "ForEdit",
