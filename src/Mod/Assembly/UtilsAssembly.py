@@ -39,9 +39,23 @@ def activeAssembly():
     if doc is None or doc.ActiveView is None:
         return None
 
+    active_assembly = doc.ActiveView.getActiveObject("part")
+
+    if active_assembly is not None and active_assembly.Type == "Assembly":
+        return active_assembly
+
+    return None
+
+
+def activePart():
+    doc = Gui.ActiveDocument
+
+    if doc is None or doc.ActiveView is None:
+        return None
+
     active_part = doc.ActiveView.getActiveObject("part")
 
-    if active_part is not None and active_part.Type == "Assembly":
+    if active_part is not None and active_part.Type != "Assembly":
         return active_part
 
     return None
@@ -77,7 +91,8 @@ def assembly_has_at_least_n_parts(n):
 def getObject(full_name):
     # full_name is "Assembly.Assembly1.LinkOrPart1.Box.Edge16"
     # or           "Assembly.Assembly1.LinkOrPart1.Body.pad.Edge16"
-    # We want either Body or Box.
+    # or           "Assembly.Assembly1.LinkOrPart1.Body.Local_CS.X"
+    # We want either Body or Box or Local_CS.
     names = full_name.split(".")
     doc = App.ActiveDocument
     if len(names) < 3:
@@ -85,6 +100,11 @@ def getObject(full_name):
             "getObject() in UtilsAssembly.py the object name is too short, at minimum it should be something like 'Assembly.Box.edge16'. It shouldn't be shorter"
         )
         return None
+
+    obj = doc.getObject(names[-2])
+
+    if obj and obj.TypeId == "PartDesign::CoordinateSystem":
+        return doc.getObject(names[-2])
 
     obj = doc.getObject(names[-3])  # So either 'Body', or 'Assembly'
 
@@ -119,6 +139,13 @@ def getContainingPart(full_name, selected_object):
 
         if not obj:
             continue
+
+        if (
+            obj.TypeId == "PartDesign::Body"
+            and selected_object.TypeId == "PartDesign::CoordinateSystem"
+        ):
+            if obj.hasObject(selected_object, True):
+                return obj
 
         # Note here we may want to specify a specific behavior for Assembly::AssemblyObject.
         if obj.TypeId == "App::Part":
@@ -210,6 +237,10 @@ def getElementName(full_name):
 
     if len(parts) < 3:
         # At minimum "Assembly.Box.edge16". It shouldn't be shorter
+        return ""
+
+    # case of PartDesign::CoordinateSystem
+    if parts[-1] == "X" or parts[-1] == "Y" or parts[-1] == "Z":
         return ""
 
     return parts[-1]
@@ -310,6 +341,9 @@ def findElementClosestVertex(selection_dict):
 
     elif elt_type == "Face":
         face = obj.Shape.Faces[elt_index - 1]
+
+        if face.Surface.TypeId == "Part::GeomSphere":
+            return selection_dict["element_name"]
 
         # Handle the circle/arc edges for their centers
         center_points = []
@@ -415,3 +449,26 @@ def isAssemblyGrounded():
             return True
 
     return False
+
+
+def removeObjAndChilds(obj):
+    removeObjsAndChilds([obj])
+
+
+def removeObjsAndChilds(objs):
+    def addsubobjs(obj, toremoveset):
+        if obj.TypeId == "App::Origin":  # Origins are already handled
+            return
+
+        toremoveset.add(obj)
+        if obj.TypeId != "App::Link":
+            for subobj in obj.OutList:
+                addsubobjs(subobj, toremoveset)
+
+    toremove = set()
+    for obj in objs:
+        addsubobjs(obj, toremove)
+
+    for obj in toremove:
+        if obj:
+            obj.Document.removeObject(obj.Name)

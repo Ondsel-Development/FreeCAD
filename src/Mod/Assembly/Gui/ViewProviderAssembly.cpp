@@ -412,6 +412,7 @@ App::DocumentObject* ViewProviderAssembly::getObjectFromSubNames(std::vector<std
 
 void ViewProviderAssembly::initMove(Base::Vector3d& mousePosition)
 {
+    Gui::Command::openCommand(tr("Move part").toStdString().c_str());
     partMoving = true;
 
     // prevent selection while moving
@@ -451,6 +452,8 @@ void ViewProviderAssembly::endMove()
 
     auto* assemblyPart = static_cast<AssemblyObject*>(getObject());
     assemblyPart->setObjMasses({});
+
+    Gui::Command::commitCommand();
 }
 
 

@@ -82,7 +82,10 @@ public:
         return "AssemblyGui::ViewProviderAssembly";
     }
 
-    int solve();
+    int solve(bool enableRedo = false);
+    void savePlacementsForUndo();
+    void undoSolve();
+    void clearUndo();
     void exportAsASMT(std::string fileName);
     std::shared_ptr<MbD::ASMTAssembly> makeMbdAssembly();
     std::shared_ptr<MbD::ASMTPart>
@@ -92,9 +95,13 @@ public:
     std::vector<std::shared_ptr<MbD::ASMTJoint>> makeMbdJoint(App::DocumentObject* joint);
     std::shared_ptr<MbD::ASMTJoint> makeMbdJointOfType(App::DocumentObject* joint,
                                                        JointType jointType);
-    bool jointUseOffset(JointType jointType);
-    bool jointUseRotation(JointType jointType);
-    bool jointUseReverse(JointType jointType);
+    std::shared_ptr<MbD::ASMTJoint> makeMbdJointDistance(App::DocumentObject* joint);
+    std::shared_ptr<MbD::ASMTJoint> makeMbdJointDistanceFaceVertex(App::DocumentObject* joint);
+    std::shared_ptr<MbD::ASMTJoint> makeMbdJointDistanceEdgeVertex(App::DocumentObject* joint);
+    std::shared_ptr<MbD::ASMTJoint> makeMbdJointDistanceFaceEdge(App::DocumentObject* joint);
+    std::shared_ptr<MbD::ASMTJoint> makeMbdJointDistanceEdgeEdge(App::DocumentObject* joint);
+    std::shared_ptr<MbD::ASMTJoint> makeMbdJointDistanceFaceFace(App::DocumentObject* joint);
+
     std::string handleOneSideOfJoint(App::DocumentObject* joint,
                                      JointType jointType,
                                      const char* propObjLinkName,
@@ -117,22 +124,21 @@ public:
 
     void swapJCS(App::DocumentObject* joint);
 
-    void applyOffsetToPlacement(Base::Placement& plc, App::DocumentObject* joint);
-    void applyRotationToPlacement(Base::Placement& plc, App::DocumentObject* joint);
-    void applyReverseToPlacement(Base::Placement& plc, App::DocumentObject* joint);
     void setNewPlacements();
     void recomputeJointPlacements(std::vector<App::DocumentObject*> joints);
+
+    bool isPartConnected(App::DocumentObject* obj);
 
     double getObjMass(App::DocumentObject* obj);
     void setObjMasses(std::vector<std::pair<App::DocumentObject*, double>> objectMasses);
 
     bool isEdgeType(App::DocumentObject* obj, const char* elName, GeomAbs_CurveType type);
     bool isFaceType(App::DocumentObject* obj, const char* elName, GeomAbs_SurfaceType type);
+    double getFaceRadius(App::DocumentObject* obj, const char* elName);
+    double getEdgeRadius(App::DocumentObject* obj, const char* elName);
 
     // getters to get from properties
-    double getJointOffset(App::DocumentObject* joint);
-    double getJointRotation(App::DocumentObject* joint);
-    double getJointReverse(App::DocumentObject* joint);
+    double getJointDistance(App::DocumentObject* joint);
     JointType getJointType(App::DocumentObject* joint);
     const char* getElementFromProp(App::DocumentObject* obj, const char* propName);
     std::string getElementTypeFromProp(App::DocumentObject* obj, const char* propName);
@@ -145,6 +151,8 @@ private:
 
     std::unordered_map<App::DocumentObject*, std::shared_ptr<MbD::ASMTPart>> objectPartMap;
     std::vector<std::pair<App::DocumentObject*, double>> objMasses;
+
+    std::vector<std::pair<App::DocumentObject*, Base::Placement>> previousPositions;
 
     // void handleChangedPropertyType(Base::XMLReader &reader, const char *TypeName, App::Property
     // *prop) override;
