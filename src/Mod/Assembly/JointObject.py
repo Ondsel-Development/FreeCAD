@@ -73,11 +73,9 @@ JointUsingReverse = [
 ]
 
 
-def flipPlacement(plc):
-    rot = plc.Rotation
-    flipRot = App.Rotation(App.Vector(1, 0, 0), 180)
-    rot = rot.multiply(flipRot)
-    plc.Rotation = rot
+def flipPlacement(plc, localXAxis):
+    flipRot = App.Rotation(localXAxis, 180)
+    plc.Rotation = plc.Rotation.multiply(flipRot)
     return plc
 
 
@@ -235,7 +233,10 @@ class Joint:
         # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
 
         if prop == "Rotation" or prop == "Offset" or prop == "Distance":
-            self.getAssembly(joint).solve()
+            if hasattr(
+                joint, "Vertex1"
+            ):  # during loading the onchanged may be triggered before full init.
+                self.getAssembly(joint).solve()
 
     def execute(self, fp):
         """Do something when doing a recomputation, this method is mandatory"""
@@ -352,22 +353,30 @@ class Joint:
 
             # First we find the translation
             if vtx_type == "Face" or joint.JointType == "Distance":
-                if (
-                    surface.TypeId == "Part::GeomCylinder"
-                    or surface.TypeId == "Part::GeomCone"
-                    or surface.TypeId == "Part::GeomTorus"
-                    or surface.TypeId == "Part::GeomSphere"
-                ):
+                if surface.TypeId == "Part::GeomCylinder" or surface.TypeId == "Part::GeomCone":
+                    centerOfG = face.CenterOfGravity - surface.Center
+                    centerPoint = surface.Center + centerOfG
+                    centerPoint = centerPoint + App.Vector().projectToLine(centerOfG, surface.Axis)
+                    plc.Base = centerPoint
+                elif surface.TypeId == "Part::GeomTorus" or surface.TypeId == "Part::GeomSphere":
                     plc.Base = surface.Center
                 else:
                     plc.Base = face.CenterOfGravity
             elif vtx_type == "Edge":
                 # In this case the edge is a circle/arc and the wanted vertex is its center.
-                circleOrArc = face.Edges[vtx_index - 1]
-                curve = circleOrArc.Curve
+                edge = face.Edges[vtx_index - 1]
+                curve = edge.Curve
                 if curve.TypeId == "Part::GeomCircle":
                     center_point = curve.Location
                     plc.Base = (center_point.x, center_point.y, center_point.z)
+
+                elif (
+                    surface.TypeId == "Part::GeomCylinder"
+                    and curve.TypeId == "Part::GeomBSplineCurve"
+                ):
+                    # handle special case of 2 cylinder intersecting.
+                    plc.Base = self.findCylindersIntersection(obj, surface, edge, elt_index)
+
             else:
                 vertex = obj.Shape.Vertexes[vtx_index - 1]
                 plc.Base = (vertex.X, vertex.Y, vertex.Z)
@@ -402,7 +411,7 @@ class Joint:
         return plc
 
     def applyOffsetToPlacement(self, plc, offset):
-        plc.Base = plc.Base + offset
+        plc.Base = plc.Base + plc.Rotation.multVec(offset)
         return plc
 
     def applyRotationToPlacement(self, plc, angle):
@@ -414,10 +423,36 @@ class Joint:
 
     def flipPart(self, joint):
         if joint.FirstPartConnected:
-            joint.Part2.Placement = flipPlacement(joint.Part2.Placement)
+            plc = joint.Part2.Placement.inverse() * joint.Placement2
+            localXAxis = plc.Rotation.multVec(App.Vector(1, 0, 0))
+            joint.Part2.Placement = flipPlacement(joint.Part2.Placement, localXAxis)
         else:
-            joint.Part1.Placement = flipPlacement(joint.Part1.Placement)
+            plc = joint.Part1.Placement.inverse() * joint.Placement1
+            localXAxis = plc.Rotation.multVec(App.Vector(1, 0, 0))
+            joint.Part1.Placement = flipPlacement(joint.Part1.Placement, localXAxis)
         self.getAssembly(joint).solve()
+
+    def findCylindersIntersection(self, obj, surface, edge, elt_index):
+        for j, facej in enumerate(obj.Shape.Faces):
+            surfacej = facej.Surface
+            if (elt_index - 1) == j or surfacej.TypeId != "Part::GeomCylinder":
+                continue
+
+            for edgej in facej.Edges:
+                if (
+                    edgej.Curve.TypeId == "Part::GeomBSplineCurve"
+                    and edgej.CenterOfGravity == edge.CenterOfGravity
+                    and edgej.Length == edge.Length
+                ):
+                    # we need intersection between the 2 cylinder axis.
+                    line1 = Part.Line(surface.Center, surface.Center + surface.Axis)
+                    line2 = Part.Line(surfacej.Center, surfacej.Center + surfacej.Axis)
+
+                    res = line1.intersect(line2, Part.Precision.confusion())
+
+                    if res:
+                        return App.Vector(res[0].X, res[0].Y, res[0].Z)
+        return surface.Center
 
 
 class ViewProviderJoint:
@@ -575,7 +610,7 @@ class ViewProviderJoint:
             if joint.getPropertyByName("Object2"):
                 self.switch_JCS2.whichChild = coin.SO_SWITCH_ALL
                 if self.areJCSReversed(joint):
-                    plc = flipPlacement(plc)
+                    plc = flipPlacement(plc, App.Vector(1, 0, 0))
                 self.set_JCS_placement(self.transform2, plc)
             else:
                 self.switch_JCS2.whichChild = coin.SO_SWITCH_NONE
@@ -645,6 +680,10 @@ class ViewProviderJoint:
         return None
 
     def doubleClicked(self, vobj):
+        assembly = vobj.Object.InList[0]
+        if UtilsAssembly.activeAssembly() != assembly:
+            Gui.ActiveDocument.ActiveView.setActiveObject("part", assembly)
+
         panel = TaskAssemblyCreateJoint(0, vobj.Object)
         Gui.Control.showDialog(panel)
 
@@ -969,6 +1008,9 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.updateJointList()
 
     def getObjSubNameFromObj(self, obj, elName):
+        if obj is None:
+            return elName
+
         if obj.TypeId == "PartDesign::Body":
             return obj.Tip.Name + "." + elName
         elif obj.TypeId == "App::Link":

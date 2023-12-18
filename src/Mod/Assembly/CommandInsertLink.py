@@ -114,21 +114,26 @@ class TaskAssemblyInsertLink(QtCore.QObject):
         App.setActiveTransaction("Insert Link")
 
     def accept(self):
-        App.closeActiveTransaction()
         self.deactivated()
+
+        if self.partMoving:
+            self.endMove()
+
+        App.closeActiveTransaction()
         return True
 
     def reject(self):
-        App.closeActiveTransaction(True)
         self.deactivated()
+
+        if self.partMoving:
+            self.dismissPart()
+
+        App.closeActiveTransaction(True)
         return True
 
     def deactivated(self):
         pref = Preferences.preferences()
         pref.SetBool("InsertInParts", self.form.CheckBox_InsertInParts.isChecked())
-
-        if self.partMoving:
-            self.dismissPart()
 
     def buildPartList(self):
         self.allParts.clear()
@@ -226,9 +231,9 @@ class TaskAssemblyInsertLink(QtCore.QObject):
         objectWhereToInsert = self.assembly
 
         if self.form.CheckBox_InsertInParts.isChecked() and selectedPart.TypeId != "App::Part":
-            objectWhereToInsert = self.assembly.newObject("App::Part", "Part " + selectedPart.Name)
+            objectWhereToInsert = self.assembly.newObject("App::Part", "Part_" + selectedPart.Label)
 
-        createdLink = objectWhereToInsert.newObject("App::Link", selectedPart.Name)
+        createdLink = objectWhereToInsert.newObject("App::Link", selectedPart.Label)
         createdLink.LinkedObject = selectedPart
         createdLink.recompute()
 
@@ -311,6 +316,7 @@ class TaskAssemblyInsertLink(QtCore.QObject):
 
     def clickMouse(self, info):
         if info["Button"] == "BUTTON1" and info["State"] == "DOWN":
+            Gui.Selection.clearSelection()
             if info["ShiftDown"]:
                 # Create a new link and moves this one now
                 addedObject = self.insertionStack[-1]["addedObject"]
@@ -319,7 +325,7 @@ class TaskAssemblyInsertLink(QtCore.QObject):
                 if addedObject.TypeId == "App::Link":
                     selectedPart = addedObject.LinkedObject
 
-                addedObject = self.assembly.newObject("App::Link", selectedPart.Name)
+                addedObject = self.assembly.newObject("App::Link", selectedPart.Label)
                 addedObject.LinkedObject = selectedPart
                 addedObject.Placement.Base = currentPos
 
