@@ -22,6 +22,7 @@
 # ***************************************************************************/
 
 import FreeCAD as App
+import Part
 
 if App.GuiUp:
     import FreeCADGui as Gui
@@ -341,8 +342,9 @@ def findElementClosestVertex(selection_dict):
 
     elif elt_type == "Face":
         face = obj.Shape.Faces[elt_index - 1]
-
-        if face.Surface.TypeId == "Part::GeomSphere":
+        surface = face.Surface
+        _type = surface.TypeId
+        if _type == "Part::GeomSphere" or _type == "Part::GeomTorus":
             return selection_dict["element_name"]
 
         # Handle the circle/arc edges for their centers
@@ -352,9 +354,23 @@ def findElementClosestVertex(selection_dict):
 
         for i, edge in enumerate(edges):
             curve = edge.Curve
-            if curve.TypeId == "Part::GeomCircle":
+            if curve.TypeId == "Part::GeomCircle" or curve.TypeId == "Part::GeomEllipse":
                 center_points.append(curve.Location)
                 center_points_edge_indexes.append(i)
+
+            elif _type == "Part::GeomCylinder" and curve.TypeId == "Part::GeomBSplineCurve":
+                # handle special case of 2 cylinder intersecting.
+                for j, facej in enumerate(obj.Shape.Faces):
+                    surfacej = facej.Surface
+                    if (elt_index - 1) != j and surfacej.TypeId == "Part::GeomCylinder":
+                        for edgej in facej.Edges:
+                            if edgej.Curve.TypeId == "Part::GeomBSplineCurve":
+                                if (
+                                    edgej.CenterOfGravity == edge.CenterOfGravity
+                                    and edgej.Length == edge.Length
+                                ):
+                                    center_points.append(edgej.CenterOfGravity)
+                                    center_points_edge_indexes.append(i)
 
         if len(center_points) > 0:
             closest_center_index, closest_center_distance = findClosestPointToMousePos(
@@ -362,10 +378,19 @@ def findElementClosestVertex(selection_dict):
             )
 
         # Handle the face vertexes
-        face_points = getPointsFromVertexes(face.Vertexes)
+        face_points = []
+
+        if _type != "Part::GeomCylinder" and _type != "Part::GeomCone":
+            face_points = getPointsFromVertexes(face.Vertexes)
 
         # We also allow users to select the center of gravity.
-        face_points.append(face.CenterOfGravity)
+        if _type == "Part::GeomCylinder" or _type == "Part::GeomCone":
+            centerOfG = face.CenterOfGravity - surface.Center
+            centerPoint = surface.Center + centerOfG
+            centerPoint = centerPoint + App.Vector().projectToLine(centerOfG, surface.Axis)
+            face_points.append(centerPoint)
+        else:
+            face_points.append(face.CenterOfGravity)
 
         closest_vertex_index, closest_vertex_distance = findClosestPointToMousePos(
             face_points, mousePos
@@ -376,6 +401,9 @@ def findElementClosestVertex(selection_dict):
                 # Note the index here is the index within the face! Not the object.
                 index = center_points_edge_indexes[closest_center_index] + 1
                 return "Edge" + str(index)
+
+        if _type == "Part::GeomCylinder" or _type == "Part::GeomCone":
+            return selection_dict["element_name"]
 
         if closest_vertex_index == len(face.Vertexes):
             # If center of gravity then we have no vertex name to set so we put element name

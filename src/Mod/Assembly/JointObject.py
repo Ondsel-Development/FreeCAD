@@ -235,7 +235,10 @@ class Joint:
         # App.Console.PrintMessage("Change property: " + str(prop) + "\n")
 
         if prop == "Rotation" or prop == "Offset" or prop == "Distance":
-            self.getAssembly(joint).solve()
+            if hasattr(
+                joint, "Vertex1"
+            ):  # during loading the onchanged may be triggered before full init.
+                self.getAssembly(joint).solve()
 
     def execute(self, fp):
         """Do something when doing a recomputation, this method is mandatory"""
@@ -352,22 +355,58 @@ class Joint:
 
             # First we find the translation
             if vtx_type == "Face" or joint.JointType == "Distance":
-                if (
-                    surface.TypeId == "Part::GeomCylinder"
-                    or surface.TypeId == "Part::GeomCone"
-                    or surface.TypeId == "Part::GeomTorus"
-                    or surface.TypeId == "Part::GeomSphere"
-                ):
+                if surface.TypeId == "Part::GeomCylinder" or surface.TypeId == "Part::GeomCone":
+                    centerOfG = face.CenterOfGravity - surface.Center
+                    centerPoint = surface.Center + centerOfG
+                    centerPoint = centerPoint + App.Vector().projectToLine(centerOfG, surface.Axis)
+                    plc.Base = centerPoint
+                elif surface.TypeId == "Part::GeomTorus" or surface.TypeId == "Part::GeomSphere":
                     plc.Base = surface.Center
                 else:
                     plc.Base = face.CenterOfGravity
             elif vtx_type == "Edge":
                 # In this case the edge is a circle/arc and the wanted vertex is its center.
-                circleOrArc = face.Edges[vtx_index - 1]
-                curve = circleOrArc.Curve
+                edge = face.Edges[vtx_index - 1]
+                curve = edge.Curve
                 if curve.TypeId == "Part::GeomCircle":
                     center_point = curve.Location
                     plc.Base = (center_point.x, center_point.y, center_point.z)
+
+                elif (
+                    surface.TypeId == "Part::GeomCylinder"
+                    and curve.TypeId == "Part::GeomBSplineCurve"
+                ):
+                    # handle special case of 2 cylinder intersecting.
+                    for j, facej in enumerate(obj.Shape.Faces):
+                        surfacej = facej.Surface
+                        if (elt_index - 1) != j and surfacej.TypeId == "Part::GeomCylinder":
+                            for edgej in facej.Edges:
+                                if edgej.Curve.TypeId == "Part::GeomBSplineCurve":
+                                    if (
+                                        edgej.CenterOfGravity == edge.CenterOfGravity
+                                        and edgej.Length == edge.Length
+                                    ):
+                                        # we need intersection between the 2 cylinder axis.
+                                        line1 = Part.Line(
+                                            surface.Center, surface.Center + surface.Axis
+                                        )
+                                        line2 = Part.Line(
+                                            surfacej.Center, surfacej.Center + surfacej.Axis
+                                        )
+
+                                        intersection = line1.intersect(
+                                            line2, Part.Precision.confusion()
+                                        )
+
+                                        if intersection:
+                                            plc.Base = App.Vector(
+                                                intersection[0].X,
+                                                intersection[0].Y,
+                                                intersection[0].Z,
+                                            )
+                                        else:
+                                            plc.Base = surface.Center
+
             else:
                 vertex = obj.Shape.Vertexes[vtx_index - 1]
                 plc.Base = (vertex.X, vertex.Y, vertex.Z)
@@ -645,6 +684,10 @@ class ViewProviderJoint:
         return None
 
     def doubleClicked(self, vobj):
+        assembly = vobj.Object.InList[0]
+        if UtilsAssembly.activeAssembly() != assembly:
+            Gui.ActiveDocument.ActiveView.setActiveObject("part", assembly)
+
         panel = TaskAssemblyCreateJoint(0, vobj.Object)
         Gui.Control.showDialog(panel)
 
