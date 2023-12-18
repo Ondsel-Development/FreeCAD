@@ -73,11 +73,9 @@ JointUsingReverse = [
 ]
 
 
-def flipPlacement(plc):
-    rot = plc.Rotation
-    flipRot = App.Rotation(App.Vector(1, 0, 0), 180)
-    rot = rot.multiply(flipRot)
-    plc.Rotation = rot
+def flipPlacement(plc, localXAxis):
+    flipRot = App.Rotation(localXAxis, 180)
+    plc.Rotation = plc.Rotation.multiply(flipRot)
     return plc
 
 
@@ -377,35 +375,7 @@ class Joint:
                     and curve.TypeId == "Part::GeomBSplineCurve"
                 ):
                     # handle special case of 2 cylinder intersecting.
-                    for j, facej in enumerate(obj.Shape.Faces):
-                        surfacej = facej.Surface
-                        if (elt_index - 1) != j and surfacej.TypeId == "Part::GeomCylinder":
-                            for edgej in facej.Edges:
-                                if edgej.Curve.TypeId == "Part::GeomBSplineCurve":
-                                    if (
-                                        edgej.CenterOfGravity == edge.CenterOfGravity
-                                        and edgej.Length == edge.Length
-                                    ):
-                                        # we need intersection between the 2 cylinder axis.
-                                        line1 = Part.Line(
-                                            surface.Center, surface.Center + surface.Axis
-                                        )
-                                        line2 = Part.Line(
-                                            surfacej.Center, surfacej.Center + surfacej.Axis
-                                        )
-
-                                        intersection = line1.intersect(
-                                            line2, Part.Precision.confusion()
-                                        )
-
-                                        if intersection:
-                                            plc.Base = App.Vector(
-                                                intersection[0].X,
-                                                intersection[0].Y,
-                                                intersection[0].Z,
-                                            )
-                                        else:
-                                            plc.Base = surface.Center
+                    plc.Base = self.findCylindersIntersection(obj, surface, edge, elt_index)
 
             else:
                 vertex = obj.Shape.Vertexes[vtx_index - 1]
@@ -441,7 +411,7 @@ class Joint:
         return plc
 
     def applyOffsetToPlacement(self, plc, offset):
-        plc.Base = plc.Base + offset
+        plc.Base = plc.Base + plc.Rotation.multVec(offset)
         return plc
 
     def applyRotationToPlacement(self, plc, angle):
@@ -453,10 +423,36 @@ class Joint:
 
     def flipPart(self, joint):
         if joint.FirstPartConnected:
-            joint.Part2.Placement = flipPlacement(joint.Part2.Placement)
+            plc = joint.Part2.Placement.inverse() * joint.Placement2
+            localXAxis = plc.Rotation.multVec(App.Vector(1, 0, 0))
+            joint.Part2.Placement = flipPlacement(joint.Part2.Placement, localXAxis)
         else:
-            joint.Part1.Placement = flipPlacement(joint.Part1.Placement)
+            plc = joint.Part1.Placement.inverse() * joint.Placement1
+            localXAxis = plc.Rotation.multVec(App.Vector(1, 0, 0))
+            joint.Part1.Placement = flipPlacement(joint.Part1.Placement, localXAxis)
         self.getAssembly(joint).solve()
+
+    def findCylindersIntersection(self, obj, surface, edge, elt_index):
+        for j, facej in enumerate(obj.Shape.Faces):
+            surfacej = facej.Surface
+            if (elt_index - 1) == j or surfacej.TypeId != "Part::GeomCylinder":
+                continue
+
+            for edgej in facej.Edges:
+                if (
+                    edgej.Curve.TypeId == "Part::GeomBSplineCurve"
+                    and edgej.CenterOfGravity == edge.CenterOfGravity
+                    and edgej.Length == edge.Length
+                ):
+                    # we need intersection between the 2 cylinder axis.
+                    line1 = Part.Line(surface.Center, surface.Center + surface.Axis)
+                    line2 = Part.Line(surfacej.Center, surfacej.Center + surfacej.Axis)
+
+                    res = line1.intersect(line2, Part.Precision.confusion())
+
+                    if res:
+                        return App.Vector(res[0].X, res[0].Y, res[0].Z)
+        return surface.Center
 
 
 class ViewProviderJoint:
@@ -614,7 +610,7 @@ class ViewProviderJoint:
             if joint.getPropertyByName("Object2"):
                 self.switch_JCS2.whichChild = coin.SO_SWITCH_ALL
                 if self.areJCSReversed(joint):
-                    plc = flipPlacement(plc)
+                    plc = flipPlacement(plc, App.Vector(1, 0, 0))
                 self.set_JCS_placement(self.transform2, plc)
             else:
                 self.switch_JCS2.whichChild = coin.SO_SWITCH_NONE
@@ -1012,6 +1008,9 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.updateJointList()
 
     def getObjSubNameFromObj(self, obj, elName):
+        if obj is None:
+            return elName
+
         if obj.TypeId == "PartDesign::Body":
             return obj.Tip.Name + "." + elName
         elif obj.TypeId == "App::Link":
