@@ -27,6 +27,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
+#include <gp_Circ.hxx>
 #include <cmath>
 #include <vector>
 #include <unordered_map>
