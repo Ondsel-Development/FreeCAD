@@ -705,8 +705,8 @@ AssemblyObject::makeMbdJoint(App::DocumentObject* joint)
         return {};
     }
 
-    std::string fullMarkerName1 = handleOneSideOfJoint(joint, jointType, "Part1", "Placement1");
-    std::string fullMarkerName2 = handleOneSideOfJoint(joint, jointType, "Part2", "Placement2");
+    std::string fullMarkerName1 = handleOneSideOfJoint(joint, "Part1", "Placement1");
+    std::string fullMarkerName2 = handleOneSideOfJoint(joint, "Part2", "Placement2");
 
     mbdJoint->setMarkerI(fullMarkerName1);
     mbdJoint->setMarkerJ(fullMarkerName2);
@@ -714,7 +714,6 @@ AssemblyObject::makeMbdJoint(App::DocumentObject* joint)
     return {mbdJoint};
 }
 std::string AssemblyObject::handleOneSideOfJoint(App::DocumentObject* joint,
-                                                 JointType jointType,
                                                  const char* propLinkName,
                                                  const char* propPlcName)
 {
