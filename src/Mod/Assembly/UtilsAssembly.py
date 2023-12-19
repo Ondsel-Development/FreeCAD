@@ -141,6 +141,9 @@ def getContainingPart(full_name, selected_object):
         if not obj:
             continue
 
+        if obj == selected_object:
+            return selected_object
+
         if (
             obj.TypeId == "PartDesign::Body"
             and selected_object.TypeId == "PartDesign::CoordinateSystem"

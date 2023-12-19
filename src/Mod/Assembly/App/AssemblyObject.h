@@ -103,7 +103,6 @@ public:
     std::shared_ptr<MbD::ASMTJoint> makeMbdJointDistanceFaceFace(App::DocumentObject* joint);
 
     std::string handleOneSideOfJoint(App::DocumentObject* joint,
-                                     JointType jointType,
                                      const char* propObjLinkName,
                                      const char* propPlcName);
     void jointParts(std::vector<App::DocumentObject*> joints);
