@@ -143,7 +143,8 @@ public:
     std::string getElementTypeFromProp(App::DocumentObject* obj, const char* propName);
     Base::Placement getPlacementFromProp(App::DocumentObject* obj, const char* propName);
     App::DocumentObject* getLinkObjFromProp(App::DocumentObject* joint, const char* propName);
-    App::DocumentObject* getLinkedObjFromProp(App::DocumentObject* joint, const char* propName);
+    App::DocumentObject*
+    getLinkedObjFromNameProp(App::DocumentObject* joint, const char* pObjName, const char* pPart);
 
 private:
     std::shared_ptr<MbD::ASMTAssembly> mbdAssembly;
