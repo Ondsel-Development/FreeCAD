@@ -28,6 +28,8 @@
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
 #include <gp_Circ.hxx>
+#include <gp_Cylinder.hxx>
+#include <gp_Sphere.hxx>
 #include <cmath>
 #include <vector>
 #include <unordered_map>
