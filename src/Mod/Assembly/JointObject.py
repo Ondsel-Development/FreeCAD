@@ -40,6 +40,7 @@ __url__ = "https://www.freecad.org"
 
 from pivy import coin
 import UtilsAssembly
+import Preferences
 
 JointTypes = [
     QT_TRANSLATE_NOOP("AssemblyJoint", "Fixed"),
@@ -71,6 +72,11 @@ JointUsingReverse = [
     QT_TRANSLATE_NOOP("AssemblyJoint", "Slider"),
     QT_TRANSLATE_NOOP("AssemblyJoint", "Distance"),
 ]
+
+
+def solveIfAllowed(assembly, storePrev=False):
+    if Preferences.preferences().GetBool("SolveInJointCreation", True):
+        assembly.solve(storePrev)
 
 
 def flipPlacement(plc, localXAxis):
@@ -256,7 +262,7 @@ class Joint:
             if hasattr(
                 joint, "Vertex1"
             ):  # during loading the onchanged may be triggered before full init.
-                self.getAssembly(joint).solve()
+                solveIfAllowed(self.getAssembly(joint))
 
     def execute(self, fp):
         """Do something when doing a recomputation, this method is mandatory"""
@@ -293,7 +299,7 @@ class Joint:
             joint.Placement2 = self.findPlacement(
                 joint, joint.Object2, joint.Part2, joint.Element2, joint.Vertex2, True
             )
-            assembly.solve(True)
+            solveIfAllowed(assembly, True)
 
         else:
             joint.Object2 = ""
@@ -457,7 +463,8 @@ class Joint:
             plc = joint.Part1.Placement.inverse() * joint.Placement1
             localXAxis = plc.Rotation.multVec(App.Vector(1, 0, 0))
             joint.Part1.Placement = flipPlacement(joint.Part1.Placement, localXAxis)
-        self.getAssembly(joint).solve()
+
+        solveIfAllowed(self.getAssembly(joint))
 
     def findCylindersIntersection(self, obj, surface, edge, elt_index):
         for j, facej in enumerate(obj.Shape.Faces):
@@ -914,7 +921,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
         self.deactivate()
 
-        self.assembly.solve()
+        solveIfAllowed(self.assembly)
 
         App.closeActiveTransaction()
         return True
