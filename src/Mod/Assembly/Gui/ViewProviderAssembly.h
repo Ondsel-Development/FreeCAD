@@ -107,9 +107,10 @@ public:
     bool partMoving;
     bool enableMovement;
     int numberOfSel;
+    Base::Vector3d initialPosition;
 
     std::vector<std::pair<App::DocumentObject*, double>> objectMasses;
-    std::vector<std::pair<App::DocumentObject*, Base::Vector3d>> docsToMove;
+    std::vector<std::pair<App::DocumentObject*, Base::Placement>> docsToMove;
 };
 
 }  // namespace AssemblyGui

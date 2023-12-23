@@ -448,8 +448,7 @@ class Joint:
     def applyRotationToPlacement(self, plc, angle):
         rot = plc.Rotation
         zRotation = App.Rotation(App.Vector(0, 0, 1), angle)
-        rot = rot.multiply(zRotation)
-        plc.Rotation = rot
+        plc.Rotation = rot * zRotation
         return plc
 
     def flipPart(self, joint):

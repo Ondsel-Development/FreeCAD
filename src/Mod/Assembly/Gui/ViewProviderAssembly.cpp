@@ -220,17 +220,30 @@ bool ViewProviderAssembly::mouseMove(const SbVec2s& cursorPos, Gui::View3DInvent
         canStartDragging = false;
 
         if (enableMovement && getSelectedObjectsWithinAssembly()) {
-            SbVec3f vec = viewer->getPointOnFocalPlane(cursorPos);
-            Base::Vector3d mousePosition = Base::Vector3d(vec[0], vec[1], vec[2]);
+            SbVec3f vec;
+            if (docsToMove.size() == 1 && rotationMove()) {
+                vec = getPointOnPlane(cursorPos, plane);
+            }
+            else {
+                vec = viewer->getPointOnFocalPlane(cursorPos);
+            }
+            initialPosition = Base::Vector3d(vec[0], vec[1], vec[2]);
 
-            initMove(mousePosition);
+            initMove(initialPosition);
         }
     }
 
     // Do the dragging of parts
     if (partMoving) {
-        SbVec3f vec = viewer->getPointOnFocalPlane(cursorPos);
-        Base::Vector3d mousePosition = Base::Vector3d(vec[0], vec[1], vec[2]);
+        SbVec3f vec;
+        if (docsToMove.size() == 1 && rotationMove()) {
+            vec = getPointOnPlane(cursorPos, plane);
+        }
+        else {
+            vec = viewer->getPointOnFocalPlane(cursorPos);
+        }
+
+        Base::Vector3d newPosition = Base::Vector3d(vec[0], vec[1], vec[2]);
         for (auto& pair : docsToMove) {
             App::DocumentObject* obj = pair.first;
             auto* propPlacement =
@@ -239,9 +252,20 @@ bool ViewProviderAssembly::mouseMove(const SbVec2s& cursorPos, Gui::View3DInvent
                 Base::Placement plc = propPlacement->getValue();
                 // Base::Console().Warning("transl %f %f %f\n", pair.second.x, pair.second.y,
                 // pair.second.z);
-                Base::Vector3d pos = mousePosition + pair.second;
-                Base::Placement newPlacement = Base::Placement(pos, plc.getRotation());
-                propPlacement->setValue(newPlacement);
+
+                if (docsToMove.size() == 1 && rotationMove()) {
+                    double angle;
+                    Base::Placement jcsPlc = ...;
+                    Base::Rotation rot = plc.getRotation();
+                    Base::Rotation zRotation = Base::Rotation(Base::Vector3d(0., 0., 1.), angle);
+                    plc.setRotation(rot * zRotation);
+                }
+                else {
+                    Base::Vector3d pos =
+                        newPosition + (pair.second.getPosition() - initialPosition);
+                    plc = Base::Placement(pos, plc.getRotation());
+                }
+                propPlacement->setValue(plc);
             }
         }
 
@@ -315,9 +339,7 @@ bool ViewProviderAssembly::getSelectedObjectsWithinAssembly()
                 auto* propPlacement =
                     dynamic_cast<App::PropertyPlacement*>(obj->getPropertyByName("Placement"));
                 if (propPlacement) {
-                    Base::Placement plc = propPlacement->getValue();
-                    Base::Vector3d pos = plc.getPosition();
-                    docsToMove.emplace_back(obj, pos);
+                    docsToMove.emplace_back(obj, propPlacement->getValue());
                 }
             }
         }
@@ -349,9 +371,7 @@ bool ViewProviderAssembly::getSelectedObjectsWithinAssembly()
                     auto* propPlacement = dynamic_cast<App::PropertyPlacement*>(
                         preselectedObj->getPropertyByName("Placement"));
                     if (propPlacement) {
-                        Base::Placement plc = propPlacement->getValue();
-                        Base::Vector3d pos = plc.getPosition();
-                        docsToMove.emplace_back(preselectedObj, pos);
+                        docsToMove.emplace_back(preselectedObj, propPlacement->getValue());
                     }
                 }
             }
@@ -446,7 +466,6 @@ void ViewProviderAssembly::initMove(Base::Vector3d& mousePosition)
     objectMasses.clear();
 
     for (auto& pair : docsToMove) {
-        pair.second = pair.second - mousePosition;
         objectMasses.push_back({pair.first, 10.0});
     }
 
