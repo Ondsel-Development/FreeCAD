@@ -638,8 +638,7 @@ class ViewProviderJoint:
                 plc = joint.Placement1
                 self.switch_JCS1.whichChild = coin.SO_SWITCH_ALL
 
-                if joint.Part1:  # prevent an unwanted call by assembly.isPartConnected
-                    self.set_JCS_placement(self.transform1, plc, joint.Object1, joint.Part1)
+                self.set_JCS_placement(self.transform1, plc, joint.Object1, joint.Part1)
             else:
                 self.switch_JCS1.whichChild = coin.SO_SWITCH_NONE
 
@@ -649,6 +648,7 @@ class ViewProviderJoint:
                 self.switch_JCS2.whichChild = coin.SO_SWITCH_ALL
                 # if self.areJCSReversed(joint):
                 #    plc = flipPlacement(plc, App.Vector(1, 0, 0))
+
                 self.set_JCS_placement(self.transform2, plc, joint.Object2, joint.Part2)
             else:
                 self.switch_JCS2.whichChild = coin.SO_SWITCH_NONE

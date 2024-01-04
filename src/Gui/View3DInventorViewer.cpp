@@ -2648,6 +2648,42 @@ SbVec2f View3DInventorViewer::getNormalizedPosition(const SbVec2s& pnt) const
     return {pX, pY};
 }
 
+SbVec3f View3DInventorViewer::getPointOnXYPlaneOfPlacement(const SbVec2s& pnt, Base::Placement plc) const
+{
+    SbVec2f pnt2d = getNormalizedPosition(pnt);
+    SoCamera* pCam = this->getSoRenderManager()->getCamera();
+
+    if (!pCam) {
+        // return invalid point
+        return {};
+    }
+
+    SbViewVolume  vol = pCam->getViewVolume();
+    SbLine line;
+    vol.projectPointToLine(pnt2d, line);
+
+    // Calculate the plane using plc
+    Base::Rotation rot = plc.getRotation();
+    Base::Vector3d normalVector = rot.multVec(Base::Vector3d(0, 0, 1));
+    SbVec3f planeNormal(normalVector.x, normalVector.y, normalVector.z);
+
+    // Get the position and convert Base::Vector3d to SbVec3f
+    Base::Vector3d pos = plc.getPosition();
+    SbVec3f planePosition(pos.x, pos.y, pos.z);
+    SbPlane xyPlane(planeNormal, planePosition);
+
+    SbVec3f pt;
+    if (xyPlane.intersect(line, pt)) {
+        return pt; // Intersection point on the XY plane
+    }
+    else {
+        // No intersection found
+        return {};
+    }
+
+    return pt;
+}
+
 SbVec3f View3DInventorViewer::getPointOnFocalPlane(const SbVec2s& pnt) const
 {
     SbVec2f pnt2d = getNormalizedPosition(pnt);
