@@ -76,6 +76,7 @@ public:
         TranslationOnAxis,
         Rotation,
         RotationOnPlane,
+        TranslationOnAxisAndRotationOnePlane,
     };
     MoveMode moveMode;
 
@@ -87,7 +88,7 @@ public:
                             const SbVec2s& cursorPos,
                             const Gui::View3DInventorViewer* viewer) override;
     MoveMode findMoveMode();
-    void initMove(Base::Vector3d& mousePosition);
+    void initMove();
     void endMove();
 
 
@@ -118,6 +119,7 @@ public:
     bool enableMovement;
     int numberOfSel;
     Base::Vector3d initialPosition;
+    Base::Vector3d initialPositionRot;
     Base::Placement jcsPlc;
     Base::Placement jcsGlobalPlc;
 

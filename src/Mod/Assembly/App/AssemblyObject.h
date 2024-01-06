@@ -116,6 +116,7 @@ public:
     std::vector<App::DocumentObject*> getGroundedJoints();
     void fixGroundedPart(App::DocumentObject* obj, Base::Placement& plc, std::string& jointName);
     std::vector<App::DocumentObject*> fixGroundedParts();
+    std::vector<App::DocumentObject*> getGroundedParts();
 
     void removeUnconnectedJoints(std::vector<App::DocumentObject*>& joints,
                                  std::vector<App::DocumentObject*> groundedObjs);
@@ -133,8 +134,11 @@ public:
     void redrawJointPlacements(std::vector<App::DocumentObject*> joints);
     void recomputeJointPlacements(std::vector<App::DocumentObject*> joints);
 
+    bool isPartGrounded(App::DocumentObject* part);
     bool isPartConnected(App::DocumentObject* part);
-    std::vector<App::DocumentObject*> getDownstreamParts(App::DocumentObject* part);
+    std::vector<App::DocumentObject*> getDownstreamParts(App::DocumentObject* part, int limit = 0);
+    std::vector<App::DocumentObject*> getUpstreamParts(App::DocumentObject* part, int limit = 0);
+    App::DocumentObject* getUpstreamMovingPart(App::DocumentObject* part);
 
     double getObjMass(App::DocumentObject* obj);
     void setObjMasses(std::vector<std::pair<App::DocumentObject*, double>> objectMasses);
@@ -181,6 +185,9 @@ public:
                                              bool ignorePlacement = false);
     static Base::Placement getGlobalPlacement(App::DocumentObject* targetObj,
                                               App::DocumentObject* container = nullptr);
+    static Base::Placement getGlobalPlacement(App::DocumentObject* joint,
+                                              const char* targetObj,
+                                              const char* container = "");
 };
 
 // using AssemblyObjectPython = App::FeaturePythonT<AssemblyObject>;

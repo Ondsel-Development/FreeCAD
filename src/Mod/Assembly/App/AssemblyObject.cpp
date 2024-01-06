@@ -307,9 +307,22 @@ AssemblyObject::getConnectedParts(App::DocumentObject* part,
     return connectedParts;
 }
 
-bool AssemblyObject::isPartConnected(App::DocumentObject* obj)
+bool AssemblyObject::isPartGrounded(App::DocumentObject* obj)
 {
     std::vector<App::DocumentObject*> groundedObjs = fixGroundedParts();
+
+    for (auto* groundedObj : groundedObjs) {
+        if (groundedObj->getFullName() == obj->getFullName()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool AssemblyObject::isPartConnected(App::DocumentObject* obj)
+{
+    std::vector<App::DocumentObject*> groundedObjs = getGroundedParts();
     std::vector<App::DocumentObject*> joints = getJoints(false);
 
     std::set<App::DocumentObject*> connectedParts;
@@ -333,8 +346,14 @@ bool AssemblyObject::isPartConnected(App::DocumentObject* obj)
     return false;
 }
 
-std::vector<App::DocumentObject*> AssemblyObject::getDownstreamParts(App::DocumentObject* part)
+std::vector<App::DocumentObject*> AssemblyObject::getDownstreamParts(App::DocumentObject* part,
+                                                                     int limit)
 {
+    if (limit > 1000) {  // Inifinite loop protection
+        return {};
+    }
+    limit++;
+
     std::vector<App::DocumentObject*> downstreamParts = {part};
     std::string name;
     App::DocumentObject* connectingJoint = getJointOfPartConnectingToGround(part, name);
@@ -349,11 +368,57 @@ std::vector<App::DocumentObject*> AssemblyObject::getDownstreamParts(App::Docume
         App::DocumentObject* downstreamPart =
             part->getFullName() == part1->getFullName() ? part2 : part1;
 
-        std::vector<App::DocumentObject*> subDownstreamParts = getDownstreamParts(downstreamPart);
-        downstreamParts.insert(downstreamParts.end(),
-                               subDownstreamParts.begin(),
-                               subDownstreamParts.end());
+        std::vector<App::DocumentObject*> subDownstreamParts =
+            getDownstreamParts(downstreamPart, limit);
+        for (auto downPart : subDownstreamParts) {
+            if (std::find(downstreamParts.begin(), downstreamParts.end(), downPart)
+                == downstreamParts.end()) {
+                downstreamParts.push_back(downPart);
+            }
+        }
     }
+    return downstreamParts;
+}
+
+std::vector<App::DocumentObject*> AssemblyObject::getUpstreamParts(App::DocumentObject* part,
+                                                                   int limit)
+{
+    if (limit > 1000) {  // Inifinite loop protection
+        return {};
+    }
+    limit++;
+
+    if (isPartGrounded(part)) {
+        return {part};
+    }
+
+    std::string name;
+    App::DocumentObject* connectingJoint = getJointOfPartConnectingToGround(part, name);
+    App::DocumentObject* upPart =
+        getLinkObjFromProp(connectingJoint, name == "Part1" ? "Part2" : "Part1");
+
+    std::vector<App::DocumentObject*> upstreamParts = getUpstreamParts(upPart, limit);
+    upstreamParts.push_back(part);
+    return upstreamParts;
+}
+
+App::DocumentObject* AssemblyObject::getUpstreamMovingPart(App::DocumentObject* part)
+{
+    if (isPartGrounded(part)) {
+        return nullptr;
+    }
+
+    std::string name;
+    App::DocumentObject* connectingJoint = getJointOfPartConnectingToGround(part, name);
+    JointType jointType = getJointType(connectingJoint);
+    if (jointType != JointType::Fixed) {
+        return part;
+    }
+
+    App::DocumentObject* upPart =
+        getLinkObjFromProp(connectingJoint, name == "Part1" ? "Part2" : "Part1");
+
+    return getUpstreamMovingPart(upPart);
 }
 
 JointGroup* AssemblyObject::getJointGroup()
@@ -371,6 +436,27 @@ JointGroup* AssemblyObject::getJointGroup()
         }
     }
     return nullptr;
+}
+
+std::vector<App::DocumentObject*> AssemblyObject::getGroundedParts()
+{
+    std::vector<App::DocumentObject*> groundedJoints = getGroundedJoints();
+
+    std::vector<App::DocumentObject*> groundedObjs;
+    for (auto gJoint : groundedJoints) {
+        if (!gJoint) {
+            continue;
+        }
+
+        auto* propObj =
+            dynamic_cast<App::PropertyLink*>(gJoint->getPropertyByName("ObjectToGround"));
+
+        if (propObj) {
+            App::DocumentObject* objToGround = propObj->getValue();
+            groundedObjs.push_back(objToGround);
+        }
+    }
+    return groundedObjs;
 }
 
 std::vector<App::DocumentObject*> AssemblyObject::fixGroundedParts()
@@ -843,7 +929,13 @@ std::string AssemblyObject::handleOneSideOfJoint(App::DocumentObject* joint,
 
     if (obj->getNameInDocument() != part->getNameInDocument()) {
         // Make plc relative to the containing part
-        plc = objPlc * plc;
+        // plc = objPlc * plc; // this would not work for nested parts.
+
+        Base::Placement obj_global_plc = getGlobalPlacement(obj, part);
+        plc = obj_global_plc * plc;
+
+        Base::Placement part_global_plc = getGlobalPlacement(part);
+        plc = part_global_plc.inverse() * plc;
     }
 
     std::string markerName = joint->getFullName();
@@ -1249,7 +1341,6 @@ bool AssemblyObject::getTargetPlacementRelativeTo(Base::Placement& foundPlc,
 {
     inContainerBranch = inContainerBranch || (!ignorePlacement && part == container);
 
-    Base::Console().Warning("getTargetPlacementRelativeTo starting ....\n");
     if (targetObj == part && inContainerBranch && !ignorePlacement) {
         foundPlc = getPlacementFromProp(targetObj, "Placement");
         return true;
@@ -1329,7 +1420,6 @@ bool AssemblyObject::getTargetPlacementRelativeTo(Base::Placement& foundPlc,
 Base::Placement AssemblyObject::getGlobalPlacement(App::DocumentObject* targetObj,
                                                    App::DocumentObject* container)
 {
-
     bool inContainerBranch = (container == nullptr);
     auto rootObjects = App::GetApplication().getActiveDocument()->getRootObjects();
     for (auto& part : rootObjects) {
@@ -1342,6 +1432,15 @@ Base::Placement AssemblyObject::getGlobalPlacement(App::DocumentObject* targetOb
     }
 
     return Base::Placement();
+}
+
+Base::Placement AssemblyObject::getGlobalPlacement(App::DocumentObject* joint,
+                                                   const char* targetObj,
+                                                   const char* container)
+{
+    App::DocumentObject* obj = getObjFromNameProp(joint, targetObj, container);
+    App::DocumentObject* part = getLinkObjFromProp(joint, container);
+    return getGlobalPlacement(obj, part);
 }
 
 double AssemblyObject::getJointDistance(App::DocumentObject* joint)
