@@ -489,7 +489,7 @@ void AboutDialog::showCredits()
     //: Header for the Credits tab of the About screen
     creditsHTML += tr("Credits");
     creditsHTML += QString::fromLatin1("</h1><p>");
-    creditsHTML += tr("FreeCAD would not be possible without the contributions of");
+    creditsHTML += tr("Ondsel ES would not be possible without the contributions of");
     creditsHTML += QString::fromLatin1(":</p><h2>"); 
     //: Header for the list of individual people in the Credits list.
     creditsHTML += tr("Individuals");

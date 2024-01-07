@@ -50,16 +50,16 @@
 using Base::Console;
 using App::Application;
 
-const char sBanner[] = "(c) Juergen Riegel, Werner Mayer, Yorik van Havre and others 2001-2023\n"\
-                       "FreeCAD is free and open-source software licensed under the terms of LGPL2+ license.\n"\
-                       "FreeCAD wouldn't be possible without FreeCAD community.\n"\
-                       "  #####                 ####  ###   ####  \n" \
-                       "  #                    #      # #   #   # \n" \
-                       "  #     ##  #### ####  #     #   #  #   # \n" \
-                       "  ####  # # #  # #  #  #     #####  #   # \n" \
-                       "  #     #   #### ####  #    #     # #   # \n" \
-                       "  #     #   #    #     #    #     # #   #  ##  ##  ##\n" \
-                       "  #     #   #### ####   ### #     # ####   ##  ##  ##\n\n" ;
+const char sBanner[] = "This application contains the FreeCAD open-source application under LGPL2.1+.\n"\
+                       "All Ondsel enhancements © Ondsel\n"\
+                       "Ondsel ES wouldn't be possible without FreeCAD community.\n"\
+                       "   ###          #           #    ##### #####\n" \
+                       "  #   #         #           #    #     #    \n" \
+                       "  #   # ###   ### #### #### #    #     #    \n" \
+                       "  #   # #  # #  # #    #    #    ####  #####\n" \
+                       "  #   # #  # #  # #### ###  #    #         #\n" \
+                       "  #   # #  # #  #    # #    #    #         #\n" \
+                       "   ###  #  # #### #### #### ##   ##### #####\n\n" ;
 
 
 
