@@ -346,8 +346,13 @@ bool ViewProviderAssembly::mouseMove(const SbVec2s& cursorPos, Gui::View3DInvent
             }
         }
 
-        auto* assemblyPart = static_cast<AssemblyObject*>(getObject());
-        assemblyPart->solve();
+        ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
+            "User parameter:BaseApp/Preferences/Mod/Assembly");
+        bool solveOnMove = hGrp->GetBool("SolveOnMove", true);
+        if (solveOnMove) {
+            auto* assemblyPart = static_cast<AssemblyObject*>(getObject());
+            assemblyPart->solve();
+        }
     }
     return false;
 }
@@ -570,8 +575,7 @@ ViewProviderAssembly::MoveMode ViewProviderAssembly::findMoveMode()
         jcsGlobalPlc = global_plc * jcsPlc;
 
         // Add downstream parts so that they move together
-        auto downstreamParts = assemblyPart->getDownstreamParts(docsToMove[0].first);
-        docsToMove.clear();  // current [0] is added by the recursive getDownstreamParts.
+        auto downstreamParts = assemblyPart->getDownstreamParts(docsToMove[0].first, joint);
         for (auto part : downstreamParts) {
             auto* propPlacement =
                 dynamic_cast<App::PropertyPlacement*>(part->getPropertyByName("Placement"));
@@ -579,6 +583,8 @@ ViewProviderAssembly::MoveMode ViewProviderAssembly::findMoveMode()
                 docsToMove.emplace_back(part, propPlacement->getValue());
             }
         }
+
+        Base::Console().Warning("docsToMove.size %d", docsToMove.size());
 
         if (jointType == JointType::Revolute) {
             return MoveMode::RotationOnPlane;
