@@ -1569,7 +1569,6 @@ App::DocumentObject* AssemblyObject::getLinkObjFromProp(App::DocumentObject* joi
 {
     auto* propObj = dynamic_cast<App::PropertyLink*>(joint->getPropertyByName(propLinkName));
     if (!propObj) {
-        Base::Console().Warning("getLinkObjFromProp nullptr\n");
         return nullptr;
     }
     return propObj->getValue();

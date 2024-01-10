@@ -591,8 +591,6 @@ ViewProviderAssembly::MoveMode ViewProviderAssembly::findMoveMode()
             }
         }
 
-        Base::Console().Warning("docsToMove.size %d", docsToMove.size());
-
         if (jointType == JointType::Revolute) {
             return MoveMode::RotationOnPlane;
         }
