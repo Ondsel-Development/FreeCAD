@@ -117,7 +117,6 @@ bool ViewProviderAssembly::canDragObject(App::DocumentObject* obj) const
 {
     Base::Console().Warning("ViewProviderAssembly::canDragObject\n");
     if (!obj || obj->getTypeId() == Assembly::JointGroup::getClassTypeId()) {
-        Base::Console().Warning("so should be false...\n");
         return false;
     }
 
@@ -657,6 +656,18 @@ void ViewProviderAssembly::onSelectionChanged(const Gui::SelectionChanges& msg)
         || msg.Type == Gui::SelectionChanges::RmvSelection) {
         canStartDragging = false;
     }
+}
+
+bool ViewProviderAssembly::onDelete(const std::vector<std::string>& subNames)
+{
+    // Delete the joingroup when assembly is deleted
+    for (auto obj : getObject()->getOutList()) {
+        if (obj->getTypeId() == Assembly::JointGroup::getClassTypeId()) {
+            obj->getDocument()->removeObject(obj->getNameInDocument());
+        }
+    }
+
+    return ViewProviderPart::onDelete(subNames);
 }
 
 PyObject* ViewProviderAssembly::getPyObject()

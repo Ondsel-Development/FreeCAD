@@ -53,6 +53,7 @@ public:
     QIcon getIcon() const override;
 
     bool doubleClicked() override;
+    bool onDelete(const std::vector<std::string>& subNames) override;
 
     /** @name enter/exit edit mode */
     //@{
