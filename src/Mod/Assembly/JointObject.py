@@ -792,7 +792,7 @@ class ViewProviderJoint:
     def doubleClicked(self, vobj):
         assembly = vobj.Object.InList[0]
         if UtilsAssembly.activeAssembly() != assembly:
-            Gui.ActiveDocument.ActiveView.setActiveObject("part", assembly)
+            Gui.ActiveDocument.setEdit(assembly)
 
         panel = TaskAssemblyCreateJoint(0, vobj.Object)
         Gui.Control.showDialog(panel)
