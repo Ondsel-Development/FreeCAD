@@ -245,6 +245,10 @@ bool ViewProviderAssembly::mouseMove(const SbVec2s& cursorPos, Gui::View3DInvent
         if (enableMovement && getSelectedObjectsWithinAssembly()) {
             moveMode = findMoveMode();
 
+            if (moveMode == MoveMode::None) {
+                return false;
+            }
+
             SbVec3f vec;
             if (moveMode == MoveMode::RotationOnPlane
                 || moveMode == MoveMode::TranslationOnAxisAndRotationOnePlane) {
@@ -547,8 +551,11 @@ ViewProviderAssembly::MoveMode ViewProviderAssembly::findMoveMode()
             // actually move A
             App::DocumentObject* upstreamPart =
                 assemblyPart->getUpstreamMovingPart(docsToMove[0].first);
-
             docsToMove.clear();
+            if (!upstreamPart) {
+                return MoveMode::None;
+            }
+
             auto* propPlacement =
                 dynamic_cast<App::PropertyPlacement*>(upstreamPart->getPropertyByName("Placement"));
             if (propPlacement) {

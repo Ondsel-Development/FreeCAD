@@ -77,6 +77,7 @@ public:
         Rotation,
         RotationOnPlane,
         TranslationOnAxisAndRotationOnePlane,
+        None,
     };
     MoveMode moveMode;
 
