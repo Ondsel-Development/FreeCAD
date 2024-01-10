@@ -962,6 +962,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
             App.setActiveTransaction("Edit " + self.jointName + " Joint")
 
             self.updateTaskboxFromJoint()
+            self.visibilityBackup = self.joint.Visibility
 
         else:
             self.jointName = self.form.jointType.currentText().replace(" ", "")
@@ -971,6 +972,9 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
             self.preselection_dict = None
 
             self.createJointObject()
+            self.visibilityBackup = False
+
+        self.joint.Visibility = True
 
         self.toggleDistanceVisibility()
         self.toggleOffsetVisibility()
@@ -1000,6 +1004,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.deactivate()
 
         solveIfAllowed(self.assembly)
+        self.joint.Visibility = self.visibilityBackup
 
         App.closeActiveTransaction()
         return True
@@ -1007,6 +1012,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
     def reject(self):
         self.deactivate()
         App.closeActiveTransaction(True)
+        self.joint.Visibility = self.visibilityBackup
         return True
 
     def deactivate(self):
