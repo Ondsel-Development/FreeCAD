@@ -954,9 +954,8 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.form.rotationSpinbox.valueChanged.connect(self.onRotationChanged)
         self.form.PushButtonReverse.clicked.connect(self.onReverseClicked)
 
-        Gui.Selection.clearSelection()
-
         if jointObj:
+            Gui.Selection.clearSelection()
             self.creating = False
             self.joint = jointObj
             self.jointName = jointObj.Label
@@ -964,6 +963,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
             self.updateTaskboxFromJoint()
             self.visibilityBackup = self.joint.Visibility
+            self.joint.Visibility = True
 
         else:
             self.creating = True
@@ -975,8 +975,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
             self.createJointObject()
             self.visibilityBackup = False
-
-        self.joint.Visibility = True
+            self.handleInitialSelection()
 
         self.toggleDistanceVisibility()
         self.toggleOffsetVisibility()
@@ -1029,6 +1028,64 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         self.setJointsPickableState(True)
         if Gui.Control.activeDialog():
             Gui.Control.closeDialog()
+
+    def handleInitialSelection(self):
+        selection = Gui.Selection.getSelectionEx("*", 0)
+        if not selection:
+            return
+        for sel in selection:
+            # If you select 2 solids (bodies for example) within an assembly.
+            # There'll be a single sel but 2 SubElementNames.
+
+            if not sel.SubElementNames:
+                # no subnames, so its a root assembly itself that is selected.
+                Gui.Selection.removeSelection(sel.Object)
+                continue
+
+            for sub_name in sel.SubElementNames:
+                # Only objects within the assembly.
+                objs_names, element_name = UtilsAssembly.getObjsNamesAndElement(
+                    sel.ObjectName, sub_name
+                )
+                if len(self.current_selection) >= 2 or self.assembly.Name not in objs_names:
+                    Gui.Selection.removeSelection(sel.Object, sub_name)
+                    continue
+
+                obj_name = sel.ObjectName
+
+                full_obj_name = UtilsAssembly.getFullObjName(obj_name, sub_name)
+                full_element_name = UtilsAssembly.getFullElementName(obj_name, sub_name)
+                selected_object = UtilsAssembly.getObject(full_element_name)
+                element_name = UtilsAssembly.getElementName(full_element_name)
+                part_containing_selected_object = UtilsAssembly.getContainingPart(
+                    full_element_name, selected_object
+                )
+
+                if selected_object == self.assembly:
+                    # do not accept selection of assembly itself
+                    Gui.Selection.removeSelection(sel.Object, sub_name)
+                    continue
+
+                if (
+                    len(self.current_selection) == 1
+                    and selected_object == self.current_selection[0]["object"]
+                ):
+                    # do not select several feature of the same object.
+                    Gui.Selection.removeSelection(sel.Object, sub_name)
+                    continue
+
+                selection_dict = {
+                    "object": selected_object,
+                    "part": part_containing_selected_object,
+                    "element_name": element_name,
+                    "full_element_name": full_element_name,
+                    "full_obj_name": full_obj_name,
+                    "vertex_name": element_name,
+                }
+
+                self.current_selection.append(selection_dict)
+
+        self.updateJoint()
 
     def createJointObject(self):
         type_index = self.form.jointType.currentIndex()
@@ -1164,7 +1221,10 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
     def moveMouse(self, info):
         if len(self.current_selection) >= 2 or (
             len(self.current_selection) == 1
-            and self.current_selection[0]["part"] == self.preselection_dict["part"]
+            and (
+                not self.preselection_dict
+                or self.current_selection[0]["part"] == self.preselection_dict["part"]
+            )
         ):
             self.joint.ViewObject.Proxy.showPreviewJCS(False)
             return
