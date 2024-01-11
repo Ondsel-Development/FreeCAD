@@ -269,6 +269,7 @@ bool ViewProviderAssembly::mouseMove(const SbVec2s& cursorPos, Gui::View3DInvent
             else if (moveMode != MoveMode::RotationOnPlane) {
                 vec = viewer->getPointOnFocalPlane(cursorPos);
                 initialPosition = Base::Vector3d(vec[0], vec[1], vec[2]);
+                prevPosition = initialPosition;
             }
 
             initMove();
@@ -342,8 +343,12 @@ bool ViewProviderAssembly::mouseMove(const SbVec2s& cursorPos, Gui::View3DInvent
                     Base::Placement jcsPlcRelativeToPart = plc.inverse() * newJcsGlobalPlc;
                     plc = rotatedGlovalJcsPlc * jcsPlcRelativeToPart.inverse();
                 }
-                else {
-                    Base::Vector3d pos = newPos + (plc.getPosition() - initialPosition);
+                else {  // MoveMode::Translation
+                    Base::Vector3d delta = newPos - prevPosition;
+                    prevPosition = newPos;
+
+                    Base::Vector3d pos = propPlacement->getValue().getPosition() + delta;
+                    // Base::Vector3d pos = newPos + (plc.getPosition() - initialPosition);
                     plc.setPosition(pos);
                 }
                 propPlacement->setValue(plc);
@@ -356,6 +361,7 @@ bool ViewProviderAssembly::mouseMove(const SbVec2s& cursorPos, Gui::View3DInvent
         if (solveOnMove) {
             auto* assemblyPart = static_cast<AssemblyObject*>(getObject());
             assemblyPart->solve();
+            // assemblyPart->doDragStep();
         }
     }
     return false;
@@ -627,14 +633,23 @@ void ViewProviderAssembly::initMove()
         viewerNotConst->setSelectionEnabled(false);
     }
 
-    objectMasses.clear();
+    ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
+        "User parameter:BaseApp/Preferences/Mod/Assembly");
+    bool solveOnMove = hGrp->GetBool("SolveOnMove", true);
+    if (solveOnMove) {
+        objectMasses.clear();
+        for (auto& pair : docsToMove) {
+            objectMasses.push_back({pair.first, 10.0});
+        }
 
-    for (auto& pair : docsToMove) {
-        objectMasses.push_back({pair.first, 10.0});
+        auto* assemblyPart = static_cast<AssemblyObject*>(getObject());
+        assemblyPart->setObjMasses(objectMasses);
+        /*std::vector<App::DocumentObject*> dragParts;
+        for (auto& pair : docsToMove) {
+            dragParts.push_back(pair.first);
+        }
+        assemblyPart->preDrag(dragParts);*/
     }
-
-    auto* assemblyPart = static_cast<AssemblyObject*>(getObject());
-    assemblyPart->setObjMasses(objectMasses);
 }
 
 void ViewProviderAssembly::endMove()
@@ -658,8 +673,14 @@ void ViewProviderAssembly::endMove()
         viewerNotConst->setSelectionEnabled(true);
     }
 
-    auto* assemblyPart = static_cast<AssemblyObject*>(getObject());
-    assemblyPart->setObjMasses({});
+    ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
+        "User parameter:BaseApp/Preferences/Mod/Assembly");
+    bool solveOnMove = hGrp->GetBool("SolveOnMove", true);
+    if (solveOnMove) {
+        auto* assemblyPart = static_cast<AssemblyObject*>(getObject());
+        // assemblyPart->postDrag();
+        assemblyPart->setObjMasses({});
+    }
 
     Gui::Command::commitCommand();
 }

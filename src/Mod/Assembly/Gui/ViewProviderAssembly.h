@@ -122,6 +122,7 @@ public:
     bool enableMovement;
     bool jointVisibilityBackup;
     int numberOfSel;
+    Base::Vector3d prevPosition;
     Base::Vector3d initialPosition;
     Base::Vector3d initialPositionRot;
     Base::Placement jcsPlc;

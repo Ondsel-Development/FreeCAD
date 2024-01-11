@@ -83,6 +83,9 @@ public:
     }
 
     int solve(bool enableRedo = false);
+    void preDrag(std::vector<App::DocumentObject*> dragParts);
+    void doDragStep();
+    void postDrag();
     void savePlacementsForUndo();
     void undoSolve();
     void clearUndo();
@@ -155,6 +158,7 @@ private:
 
     std::unordered_map<App::DocumentObject*, std::shared_ptr<MbD::ASMTPart>> objectPartMap;
     std::vector<std::pair<App::DocumentObject*, double>> objMasses;
+    std::vector<std::shared_ptr<MbD::ASMTPart>> dragMbdParts;
 
     std::vector<std::pair<App::DocumentObject*, Base::Placement>> previousPositions;
 

@@ -618,6 +618,56 @@ int AssemblyObject::solve(bool enableRedo)
     return 0;
 }
 
+void AssemblyObject::preDrag(std::vector<App::DocumentObject*> dragParts)
+{
+    solve();
+
+    dragMbdParts.clear();
+    for (auto part : dragParts) {
+        dragMbdParts.push_back(getMbDPart(part));
+    }
+
+    mbdAssembly->runPreDrag();
+}
+
+void AssemblyObject::doDragStep()
+{
+    for (auto& mbdPart : dragMbdParts) {
+        App::DocumentObject* part = nullptr;
+        for (auto& pair : objectPartMap) {
+            if (pair.second == mbdPart) {
+                part = pair.first;
+                break;
+            }
+        }
+        if (!part) {
+            continue;
+        }
+
+        Base::Placement plc = getPlacementFromProp(part, "Placement");
+        Base::Vector3d pos = plc.getPosition();
+        mbdPart->setPosition3D(pos.x, pos.y, pos.z);
+
+        Base::Rotation rot = plc.getRotation();
+        Base::Matrix4D mat;
+        rot.getValue(mat);
+        Base::Vector3d r0 = mat.getRow(0);
+        Base::Vector3d r1 = mat.getRow(1);
+        Base::Vector3d r2 = mat.getRow(2);
+        mbdPart->setRotationMatrix(r0.x, r0.y, r0.z, r1.x, r1.y, r1.z, r2.x, r2.y, r2.z);
+    }
+
+    auto dragPartsVec = std::make_shared<std::vector<std::shared_ptr<ASMTPart>>>(dragMbdParts);
+    mbdAssembly->runDragStep(dragPartsVec);
+    setNewPlacements();
+    redrawJointPlacements(getJoints());
+}
+
+void AssemblyObject::postDrag()
+{
+    mbdAssembly->runPostDrag();  // Do this after last drag
+}
+
 void AssemblyObject::exportAsASMT(std::string fileName)
 {
     mbdAssembly = makeMbdAssembly();
@@ -1029,17 +1079,17 @@ std::shared_ptr<ASMTPart> AssemblyObject::getMbDPart(App::DocumentObject* obj)
 std::shared_ptr<ASMTPart>
 AssemblyObject::makeMbdPart(std::string& name, Base::Placement plc, double mass)
 {
-    auto mdbPart = CREATE<ASMTPart>::With();
-    mdbPart->setName(name);
+    auto mbdPart = CREATE<ASMTPart>::With();
+    mbdPart->setName(name);
 
     auto massMarker = CREATE<ASMTPrincipalMassMarker>::With();
     massMarker->setMass(mass);
     massMarker->setDensity(1.0);
     massMarker->setMomentOfInertias(1.0, 1.0, 1.0);
-    mdbPart->setPrincipalMassMarker(massMarker);
+    mbdPart->setPrincipalMassMarker(massMarker);
 
     Base::Vector3d pos = plc.getPosition();
-    mdbPart->setPosition3D(pos.x, pos.y, pos.z);
+    mbdPart->setPosition3D(pos.x, pos.y, pos.z);
     // Base::Console().Warning("MbD Part placement : (%f, %f, %f)\n", pos.x, pos.y, pos.z);
 
     // TODO : replace with quaternion to simplify
@@ -1049,12 +1099,12 @@ AssemblyObject::makeMbdPart(std::string& name, Base::Placement plc, double mass)
     Base::Vector3d r0 = mat.getRow(0);
     Base::Vector3d r1 = mat.getRow(1);
     Base::Vector3d r2 = mat.getRow(2);
-    mdbPart->setRotationMatrix(r0.x, r0.y, r0.z, r1.x, r1.y, r1.z, r2.x, r2.y, r2.z);
+    mbdPart->setRotationMatrix(r0.x, r0.y, r0.z, r1.x, r1.y, r1.z, r2.x, r2.y, r2.z);
     /*double q0, q1, q2, q3;
     rot.getValue(q0, q1, q2, q3);
-    mdbPart->setQuarternions(q0, q1, q2, q3);*/
+    mbdPart->setQuarternions(q0, q1, q2, q3);*/
 
-    return mdbPart;
+    return mbdPart;
 }
 
 std::shared_ptr<ASMTAssembly> AssemblyObject::makeMbdAssembly()
