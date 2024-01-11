@@ -68,17 +68,20 @@ public:
                                const std::vector<Part::Geometry*>& geos,
                                Mode mode = Mode::CreateInternalGeometry);
 
-    static std::string convert(const Sketcher::Constraint* constraint);
+    static std::string convert(const Sketcher::Constraint* constraint,
+                               bool useLastGeoIdVar = false);
 
     static std::string convert(const std::string& doc,
-                               const std::vector<Sketcher::Constraint*>& constraints);
+                               const std::vector<Sketcher::Constraint*>& constraints,
+                               bool useLastGeoIdVar = false);
 
     static std::vector<std::string> multiLine(std::string&& singlestring);
 
 private:
     static SingleGeometry process(const Part::Geometry* geo);
 
-    static std::string process(const Sketcher::Constraint* constraint);
+    static std::string process(const Sketcher::Constraint* constraint,
+                               bool useLastGeoIdVar = false);
 };
 
 }  // namespace Sketcher
