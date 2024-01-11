@@ -957,6 +957,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
         Gui.Selection.clearSelection()
 
         if jointObj:
+            self.creating = False
             self.joint = jointObj
             self.jointName = jointObj.Label
             App.setActiveTransaction("Edit " + self.jointName + " Joint")
@@ -965,6 +966,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
             self.visibilityBackup = self.joint.Visibility
 
         else:
+            self.creating = True
             self.jointName = self.form.jointType.currentText().replace(" ", "")
             App.setActiveTransaction("Create " + self.jointName + " Joint")
 
@@ -997,10 +999,6 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
             App.Console.PrintWarning("You need to select 2 elements from 2 separate parts.")
             return False
 
-        # Hide JSC's when joint is created and enable selection highlighting
-        # self.joint.ViewObject.Visibility = False
-        # self.joint.ViewObject.OnTopWhenSelected = "Enabled"
-
         self.deactivate()
 
         solveIfAllowed(self.assembly)
@@ -1012,7 +1010,8 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
     def reject(self):
         self.deactivate()
         App.closeActiveTransaction(True)
-        self.joint.Visibility = self.visibilityBackup
+        if not self.creating:  # update visibility only if we are editing the joint
+            self.joint.Visibility = self.visibilityBackup
         return True
 
     def deactivate(self):
