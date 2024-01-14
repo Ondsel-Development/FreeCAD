@@ -167,11 +167,10 @@ int main( int argc, char ** argv )
     App::Application::Config()["StartWorkbench"] = "StartWorkbench";
     //App::Application::Config()["HiddenDockWindow"] = "Property editor";
     App::Application::Config()["SplashAlignment" ] = "Bottom|Left";
-    App::Application::Config()["SplashTextColor" ] = "#8aadf4"; // light blue
-    App::Application::Config()["SplashInfoColor" ] = "#8aadf4"; // light blue 
+    App::Application::Config()["SplashTextColor" ] = "#8aadf4";  // light blue
+    App::Application::Config()["SplashInfoColor" ] = "#8aadf4";  // light blue
     App::Application::Config()["SplashInfoPosition" ] = "6,75";
-
-    QGuiApplication::setDesktopFileName(QStringLiteral("org.freecad.FreeCAD.desktop"));
+    App::Application::Config()["DesktopFileName"] = "org.freecad.FreeCAD.desktop";
 
     try {
         // Init phase ===========================================================
@@ -186,6 +185,10 @@ int main( int argc, char ** argv )
 #else
         App::Application::init(argc, argv);
 #endif
+        // to set window icon on wayland, the desktop file has to be available to the compositor
+        // auto desktopfile = App::Application::Config()["DesktopFileName"].c_str();
+        QGuiApplication::setDesktopFileName(QString::fromLatin1(App::Application::Config()["DesktopFileName"].c_str()));
+
 #if defined(_MSC_VER)
         // create a dump file when the application crashes
         std::string dmpfile = App::Application::getUserAppDataDir();
