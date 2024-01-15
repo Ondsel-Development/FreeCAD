@@ -550,10 +550,10 @@ StdCmdFreeCADWebsite::StdCmdFreeCADWebsite()
   :Command("Std_FreeCADWebsite")
 {
     sGroup        = "Help";
-    sMenuText     = QT_TR_NOOP("FreeCAD Website");
-    sToolTipText  = QT_TR_NOOP("The FreeCAD website");
+    sMenuText     = QT_TR_NOOP("Ondsel Website");
+    sToolTipText  = QT_TR_NOOP("The Ondsel website");
     sWhatsThis    = "Std_FreeCADWebsite";
-    sStatusTip    = QT_TR_NOOP("FreeCAD Website");
+    sStatusTip    = QT_TR_NOOP("Ondsel Website");
     sPixmap       = "internet-web-browser";
     eType         = 0;
 }
@@ -561,7 +561,7 @@ StdCmdFreeCADWebsite::StdCmdFreeCADWebsite()
 void StdCmdFreeCADWebsite::activated(int iMsg)
 {
     Q_UNUSED(iMsg);
-    std::string defaulturl = QCoreApplication::translate(this->className(),"https://www.freecad.org").toStdString();
+    std::string defaulturl = QCoreApplication::translate(this->className(),"https://www.ondsel.com").toStdString();
     ParameterGrp::handle hURLGrp = App::GetApplication().GetParameterGroupByPath("User parameter:BaseApp/Preferences/Websites");
     std::string url = hURLGrp->GetASCII("WebPage", defaulturl.c_str());
     hURLGrp->SetASCII("WebPage", url.c_str());
@@ -634,10 +634,10 @@ StdCmdFreeCADForum::StdCmdFreeCADForum()
   :Command("Std_FreeCADForum")
 {
     sGroup        = "Help";
-    sMenuText     = QT_TR_NOOP("FreeCAD Forum");
-    sToolTipText  = QT_TR_NOOP("The FreeCAD forum, where you can find help from other users");
+    sMenuText     = QT_TR_NOOP("Ondsel Discord channel");
+    sToolTipText  = QT_TR_NOOP("The Ondsel Discord channel, where you can find help");
     sWhatsThis    = "Std_FreeCADForum";
-    sStatusTip    = QT_TR_NOOP("The FreeCAD Forum");
+    sStatusTip    = QT_TR_NOOP("Ondsel Discord channel");
     sPixmap       = "internet-web-browser";
     eType         = 0;
 }
@@ -645,7 +645,7 @@ StdCmdFreeCADForum::StdCmdFreeCADForum()
 void StdCmdFreeCADForum::activated(int iMsg)
 {
     Q_UNUSED(iMsg);
-    std::string defaulturl = QCoreApplication::translate(this->className(),"https://forum.freecad.org").toStdString();
+    std::string defaulturl = QCoreApplication::translate(this->className(),"https://discord.gg/7jmzezyyfP").toStdString();
     ParameterGrp::handle hURLGrp = App::GetApplication().GetParameterGroupByPath("User parameter:BaseApp/Preferences/Websites");
     std::string url = hURLGrp->GetASCII("UserForum", defaulturl.c_str());
     hURLGrp->SetASCII("UserForum", url.c_str());
