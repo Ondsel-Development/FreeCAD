@@ -330,10 +330,6 @@ def build_new_file_card(template):
             TranslationTexts.get("T_TEMPLATE_2DDRAFT_NAME"),
             TranslationTexts.get("T_TEMPLATE_2DDRAFT_DESC"),
         ],
-        "architecture": [
-            TranslationTexts.get("T_TEMPLATE_ARCHITECTURE_NAME"),
-            TranslationTexts.get("T_TEMPLATE_ARCHITECTURE_DESC"),
-        ],
     }
 
     if template not in templates:
