@@ -40,12 +40,12 @@ def get(handle):
     "returns the translated text of the given handle"
 
     T_TITLE = translate("StartPage", "Start")
-    T_WELCOME = translate("StartPage", "Welcome to FreeCAD")
+    T_WELCOME = translate("StartPage", "Welcome to Ondsel ES")
     T_DOCUMENTS = translate("StartPage", "Documents")
     T_HELP = translate("StartPage", "Help")
     T_ACTIVITY = translate("StartPage", "Activity")
     T_BLOG = translate("StartPage", "Blog")
-    T_TOOLTIP_BLOG = translate("StartPage", "Link to the FreeCAD blog")
+    T_TOOLTIP_BLOG = translate("StartPage", "Link to the Ondsel blog")
     T_NEWFILE = translate("StartPage", "New file")
     T_TEMPLATE_EMPTYFILE_NAME = translate("StartPage", "Empty File")
     T_TEMPLATE_EMPTYFILE_DESC = translate("StartPage", "Create an empty FreeCAD file")
