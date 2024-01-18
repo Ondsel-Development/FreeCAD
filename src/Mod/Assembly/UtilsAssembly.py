@@ -220,7 +220,7 @@ def getContainingPart(full_name, selected_object, activeAssemblyOrPart=None):
                 if linked_obj.hasObject(selected_object, True):
                     if not activeAssemblyOrPart:
                         return obj
-                    elif (
+                    elif (linked_obj.Document == activeAssemblyOrPart.Document) and (
                         linked_obj.hasObject(activeAssemblyOrPart, True)
                         or linked_obj == activeAssemblyOrPart
                     ):
