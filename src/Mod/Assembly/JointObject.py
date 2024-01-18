@@ -608,7 +608,10 @@ class ViewProviderJoint:
 
         camera = Gui.ActiveDocument.ActiveView.getCameraNode()
         self.cameraSensor = coin.SoFieldSensor(self.camera_callback, camera)
-        self.cameraSensor.attach(camera.height)
+        if isinstance(camera, coin.SoPerspectiveCamera):
+            self.cameraSensor.attach(camera.focalDistance)
+        elif isinstance(camera, coin.SoOrthographicCamera):
+            self.cameraSensor.attach(camera.height)
 
         self.app_obj = vobj.Object
 
@@ -711,7 +714,14 @@ class ViewProviderJoint:
 
     def get_JCS_size(self):
         camera = Gui.ActiveDocument.ActiveView.getCameraNode()
-        if not camera:
+
+        # Check if the camera is a perspective camera
+        if isinstance(camera, coin.SoPerspectiveCamera):
+            return camera.focalDistance.getValue() / 20
+        elif isinstance(camera, coin.SoOrthographicCamera):
+            return camera.height.getValue() / 20
+        else:
+            # Default value if camera type is unknown
             return 10
 
         return camera.height.getValue() / 20
