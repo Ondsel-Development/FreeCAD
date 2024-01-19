@@ -282,9 +282,14 @@ def getJcsGlobalPlc(jcsPlc, objName, part):
 # The container is used to support cases where the same object appears at several places
 # which happens when you have a link to a part.
 def getGlobalPlacement(targetObj, container=None):
+    if targetObj is None:
+        return App.Placement()
+
     inContainerBranch = container is None
-    for part in App.activeDocument().RootObjects:
-        foundPlacement = getTargetPlacementRelativeTo(targetObj, part, container, inContainerBranch)
+    for rootObj in App.activeDocument().RootObjects:
+        foundPlacement = getTargetPlacementRelativeTo(
+            targetObj, rootObj, container, inContainerBranch
+        )
         if foundPlacement is not None:
             return foundPlacement
 
