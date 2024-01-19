@@ -321,6 +321,10 @@ bool ViewProviderAssembly::mouseMove(const SbVec2s& cursorPos, Gui::View3DInvent
                     Base::Placement jcsPlcRelativeToPart = plc.inverse() * jcsGlobalPlc;
                     plc = rotatedGlovalJcsPlc * jcsPlcRelativeToPart.inverse();
                 }
+                else if (moveMode == MoveMode::TranslationOnAxis) {
+                    Base::Vector3d pos = plc.getPosition() + (newPos - initialPosition);
+                    plc.setPosition(pos);
+                }
                 else if (moveMode == MoveMode::TranslationOnAxisAndRotationOnePlane) {
                     Base::Vector3d pos = plc.getPosition() + (newPos - initialPosition);
                     plc.setPosition(pos);
@@ -328,6 +332,7 @@ bool ViewProviderAssembly::mouseMove(const SbVec2s& cursorPos, Gui::View3DInvent
                     Base::Placement newJcsGlobalPlc = jcsGlobalPlc;
                     newJcsGlobalPlc.setPosition(jcsGlobalPlc.getPosition()
                                                 + (newPos - initialPosition));
+
                     Base::Vector3d center = newJcsGlobalPlc.getPosition();
                     Base::Vector3d norm =
                         newJcsGlobalPlc.getRotation().multVec(Base::Vector3d(0., 0., -1.));
