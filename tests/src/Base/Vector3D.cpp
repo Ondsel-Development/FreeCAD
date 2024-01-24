@@ -261,3 +261,14 @@ TEST(Vector, TestAngle)
     double angle = vec1.GetAngle(vec2);
     EXPECT_EQ(angle, Base::float_traits<double>::pi() / 2);
 }
+
+TEST(Vector, TestAngleOriented)
+{
+    Base::Vector3d vec1(0.000001, 0, 0);
+    Base::Vector3d vec2(0, 0.000001, 0);
+    Base::Vector3d norm(0, 0, 0.000001);
+    double angle = vec1.GetAngleOriented(vec2, norm);
+    EXPECT_EQ(angle, Base::float_traits<double>::pi() * 0.5);
+    angle = vec2.GetAngleOriented(vec1, norm);
+    EXPECT_EQ(angle, Base::float_traits<double>::pi() * 1.5);
+}
