@@ -1,3 +1,4 @@
+add_subdirectory(Assembly)
 add_subdirectory(Material)
 add_subdirectory(Mesh)
 add_subdirectory(Part)
