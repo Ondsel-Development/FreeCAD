@@ -22,7 +22,3 @@
 # **************************************************************************/
 
 import StartGui  # Not unused, import has a side-effect of creating the "Start_Start" command
-import StartMigrator
-
-migrator = StartMigrator.StartMigrator2024()
-migrator.run_migration()
