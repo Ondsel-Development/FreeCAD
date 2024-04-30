@@ -93,7 +93,7 @@ public:
     void EnsureLaunched()
     {
         // It's possible that "Start_Start" didn't result in the creation of an MDI window, if it
-        // was called to early. This polls the views to make sure the view was created, and if it
+        // was called too early. This polls the views to make sure the view was created, and if it
         // was not, re-calls the command.
         auto mw = Gui::getMainWindow();
         auto existingView = mw->findChild<StartGui::StartView*>(QLatin1String("StartView"));

@@ -55,11 +55,9 @@ void ThemeSelectorWidget::setupButtons(QBoxLayout* layout)
     if (!layout) {
         return;
     }
-    std::map<Theme, QString> themeMap {{Theme::Classic, tr("Classic")},
-                                       {Theme::Dark, tr("Dark theme")},
+    std::map<Theme, QString> themeMap {{Theme::Dark, tr("Dark theme")},
                                        {Theme::Light, tr("Light theme")}};
     std::map<Theme, QIcon> iconMap {
-        {Theme::Classic, QIcon(QLatin1String(":/thumbnails/Theme_thumbnail_classic.png"))},
         {Theme::Light, QIcon(QLatin1String(":/thumbnails/Theme_thumbnail_light.png"))},
         {Theme::Dark, QIcon(QLatin1String(":/thumbnails/Theme_thumbnail_dark.png"))}};
     auto hGrp = App::GetApplication().GetParameterGroupByPath(
@@ -116,10 +114,10 @@ void ThemeSelectorWidget::themeChanged(Theme newTheme)
             prefPackManager->apply("Classic");
             break;
         case Theme::Dark:
-            prefPackManager->apply("Dark theme");
+            prefPackManager->apply("OpenDark");
             break;
         case Theme::Light:
-            prefPackManager->apply("Light theme");
+            prefPackManager->apply("OpenLight");
             break;
     }
 }
@@ -138,5 +136,4 @@ void ThemeSelectorWidget::retranslateUi()
     _descriptionLabel->setText(tr("More themes are available online using the Addon Manager"));
     _buttons[static_cast<int>(Theme::Dark)]->setText(tr("Dark theme", "Visual theme name"));
     _buttons[static_cast<int>(Theme::Light)]->setText(tr("Light theme", "Visual theme name"));
-    _buttons[static_cast<int>(Theme::Classic)]->setText(tr("Classic", "Visual theme name"));
 }

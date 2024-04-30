@@ -238,34 +238,15 @@ QString StartView::fileCardStyle() const
         return color;
     };
 
-    QColor background(221, 221, 221);  // NOLINT
-    background = getUserColor(background, "FileCardBackgroundColor");
-
-    QColor hovered(98, 160, 234);  // NOLINT
-    hovered = getUserColor(hovered, "FileCardBorderColor");
-
-    QColor pressed(38, 162, 105);  // NOLINT
-    pressed = getUserColor(pressed, "FileCardSelectionColor");
-
     return QString::fromLatin1("QPushButton {"
-                               " background-color: rgb(%1, %2, %3);"
                                " border-radius: 8px;"
                                "}"
                                "QPushButton:hover {"
-                               " border: 2px solid rgb(%4, %5, %6);"
+                               " border: 2px;"
                                "}"
                                "QPushButton:pressed {"
-                               " border: 2px solid rgb(%7, %8, %9);"
-                               "}")
-        .arg(background.red())
-        .arg(background.green())
-        .arg(background.blue())
-        .arg(hovered.red())
-        .arg(hovered.green())
-        .arg(hovered.blue())
-        .arg(pressed.red())
-        .arg(pressed.green())
-        .arg(pressed.blue());
+                               " border: 2px;"
+                               "}");
 }
 
 void StartView::configureFileCardWidget(QListView* fileCardWidget)
