@@ -21,9 +21,7 @@
 #                                                                           *
 # **************************************************************************/
 
-# Get the Parameter Group of this module
-ParGrp = App.ParamGet("System parameter:Modules").GetGroup("Start")
+import StartMigrator
 
-# Set the needed information
-ParGrp.SetString("WorkBenchName", "Start")
-ParGrp.SetString("WorkBenchModule", "Start.py")
+migrator = StartMigrator.StartMigrator2024()
+migrator.run_migration()
