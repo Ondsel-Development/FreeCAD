@@ -484,8 +484,10 @@ void AboutDialog::showCredits()
     //: Header for the Credits tab of the About screen
     creditsHTML += tr("Credits");
     creditsHTML += QString::fromLatin1("</h1><p>");
-    creditsHTML += tr("FreeCAD would not be possible without the contributions of");
-    creditsHTML += QString::fromLatin1(":</p><h2>"); 
+    creditsHTML += tr("Ondsel ES would not be possible without Shai Seger (Sheet Metal workbench), "
+                      "Joe Sardos (OpenTheme), the design working group, and all the other FreeCAD "
+                      "maintainers and contributors:");
+    creditsHTML += QString::fromLatin1(":</p><h2>");
     //: Header for the list of individual people in the Credits list.
     creditsHTML += tr("Individuals");
     creditsHTML += QString::fromLatin1("</h2><ul>");
