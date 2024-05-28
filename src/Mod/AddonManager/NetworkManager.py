@@ -306,9 +306,12 @@ if HAVE_QTNETWORK:
 
         def __setup_network_request(self):
             """Get the next request off the queue and launch it."""
+            print("Setup network request")
             try:
                 item = self.queue.get_nowait()
+                print(f"item: {item}")
                 if item:
+                    print(f"item: {item}")
                     if item.index in self.__abort_when_found:
                         self.__abort_when_found.remove(item.index)
                         return  # Do not do anything with this item, it's been aborted...
@@ -321,6 +324,7 @@ if HAVE_QTNETWORK:
         def __launch_request(self, index: int, request: QtNetwork.QNetworkRequest) -> None:
             """Given a network request, ask the QNetworkAccessManager to begin processing it."""
             reply = self.QNAM.get(request)
+            print(f"__launch_request, reply: {reply}")
             self.replies[index] = reply
 
             self.__last_started_index = index
@@ -409,6 +413,7 @@ if HAVE_QTNETWORK:
         ) -> None:
             """Check the return status of a completed process, and handle its returned data (if
             any)."""
+            FreeCAD.Console.PrintLog("__synchronous_process_completion\n")
             with self.synchronous_lock:
                 if index in self.synchronous_complete:
                     if code == 200:
@@ -580,6 +585,7 @@ if HAVE_QTNETWORK:
             """Called when a reply has been completed: this makes sure the data has been read and
             any notifications have been called."""
             reply = self.sender()
+            print(f"__reply_finished: {reply}")
             if not reply:
                 # This can happen during a cancellation operation: silently do nothing
                 return
@@ -590,15 +596,21 @@ if HAVE_QTNETWORK:
                     index = key
                     break
             if index is None:
+                print(f"__reply_finished: index is None")
                 return
+
+            print(f"__reply_finished: {index}")
 
             response_code = reply.attribute(QtNetwork.QNetworkRequest.HttpStatusCodeAttribute)
             if response_code == 301 or response_code == 302:  # This is a redirect, bail out
+                print("redirect")
                 return
             if reply.error() != QtNetwork.QNetworkReply.NetworkError.OperationCanceledError:
+                print("mark the queue task done")
                 # It this was not a timeout, make sure we mark the queue task done
                 self.queue.task_done()
             if reply.error() == QtNetwork.QNetworkReply.NetworkError.NoError:
+                print("no error")
                 if index in self.monitored_connections:
                     # Make sure to read any remaining data
                     self.__data_incoming(index, reply)
@@ -608,11 +620,17 @@ if HAVE_QTNETWORK:
                     self.progress_complete.emit(index, response_code, f.name)
                 else:
                     data = reply.readAll()
+                    FreeCAD.Console.PrintLog(
+                        f"emitting completed 2 {index} {response_code} {data}\n"
+                    )
                     self.completed.emit(index, response_code, data)
             else:
                 if index in self.monitored_connections:
                     self.progress_complete.emit(index, response_code, "")
                 else:
+                    FreeCAD.Console.PrintLog(
+                        f"emitting completed 1 {index} {response_code} {reply.request().url()}\n"
+                    )
                     self.completed.emit(index, response_code, None)
             self.replies.pop(index)
 
@@ -691,6 +709,7 @@ if __name__ == "__main__":
                 f"For request {index+1}, request failed with HTTP result code {code}",
                 flush=True,
             )
+        FreeCAD.Console.PrintLog("handle_completion\n")
 
         count += 1
         if count >= len(urls):

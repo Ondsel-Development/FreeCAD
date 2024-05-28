@@ -88,6 +88,7 @@ class UpdateMetadataCacheWorker(QtCore.QThread):
 
         for repo in self.repos:
             if not repo.macro and repo.url and utils.recognized_git_location(repo):
+                FreeCAD.Console.PrintLog(f"repo.url: {repo.url}\n")
                 # package.xml
                 index = NetworkManager.AM_NETWORK_MANAGER.submit_unmonitored_get(
                     utils.construct_git_url(repo, "package.xml")
@@ -118,13 +119,23 @@ class UpdateMetadataCacheWorker(QtCore.QThread):
                 )
                 self.total_requests += 1
 
+        FreeCAD.Console.PrintLog(f"requests: {len(self.requests)}")
+
+        count = 0
+
         while self.requests:
             if current_thread.isInterruptionRequested():
                 for request in self.requests:
+                    FreeCAD.Console.PrintLog(f"request: {request.url()}")
                     NetworkManager.AM_NETWORK_MANAGER.abort(request)
                 return
+            # FreeCAD.Console.PrintLog(f"processEvents: {self.requests}\n")
             # 50 ms maximum between checks for interruption
-            QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 50)
+            count += 1
+            print(f"len(requests): {len(self.requests)}, {count}")
+            # for i in self.requests:
+            #     print(f"  request: {i}: {self.requests[i][0]}")
+            QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 1000)
 
         # This set contains one copy of each of the repos that got some kind of data in
         # this process. For those repos, tell the main Addon Manager code that it needs
@@ -137,6 +148,7 @@ class UpdateMetadataCacheWorker(QtCore.QThread):
         if index in self.requests:
             self.requests_completed += 1
             self.progress_made.emit(self.requests_completed, self.total_requests)
+            print(f"popping index {index}")
             request = self.requests.pop(index)
             if code == 200:  # HTTP success
                 self.updated_repos.add(request[0])  # mark this repo as updated
@@ -148,6 +160,9 @@ class UpdateMetadataCacheWorker(QtCore.QThread):
                     self.process_requirements_txt(request[0], data)
                 elif request[1] == UpdateMetadataCacheWorker.RequestType.ICON:
                     self.process_icon(request[0], data)
+        else:
+            print("index not in self.requests")
+        FreeCAD.Console.PrintLog("download_completed\n")
 
     def process_package_xml(self, repo: Addon, data: QtCore.QByteArray):
         """Process the package.xml metadata file"""
@@ -168,11 +183,16 @@ class UpdateMetadataCacheWorker(QtCore.QThread):
         # Grab a new copy of the icon as well: we couldn't enqueue this earlier because
         # we didn't know the path to it, which is stored in the package.xml file.
         icon = repo.get_best_icon_relative_path()
+        FreeCAD.Console.PrintLog("here\n")
 
         icon_url = utils.construct_git_url(repo, icon)
+        FreeCAD.Console.PrintLog("here 2\n")
         index = NetworkManager.AM_NETWORK_MANAGER.submit_unmonitored_get(icon_url)
+        FreeCAD.Console.PrintLog("here 3\n")
         self.requests[index] = (repo, UpdateMetadataCacheWorker.RequestType.ICON)
+        FreeCAD.Console.PrintLog("here 4\n")
         self.total_requests += 1
+        FreeCAD.Console.PrintLog("here 5\n")
 
     def _decode_data(self, byte_data, addon_name, file_name) -> str:
         """UTF-8 decode data, and print an error message if that fails"""
@@ -269,13 +289,16 @@ class UpdateMetadataCacheWorker(QtCore.QThread):
 
     def process_icon(self, repo: Addon, data: QtCore.QByteArray):
         """Convert icon data into a valid icon file and store it"""
+        FreeCAD.Console.PrintLog(f"Downloaded icon for {repo.display_name}\n")
         self.status_message.emit(
             translate("AddonsInstaller", "Downloaded icon for {}").format(repo.display_name)
         )
         cache_file = repo.get_cached_icon_filename()
+        FreeCAD.Console.PrintLog(f"2 Downloaded icon for {repo.display_name}\n")
         with open(cache_file, "wb") as icon_file:
             icon_file.write(data.data())
             repo.cached_icon_filename = cache_file
+        FreeCAD.Console.PrintLog(f"3 Downloaded icon for {repo.display_name}\n")
 
 
 #  @}
