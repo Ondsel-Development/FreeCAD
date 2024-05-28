@@ -120,23 +120,24 @@ class UpdateMetadataCacheWorker(QtCore.QThread):
                 )
                 self.total_requests += 1
 
-        FreeCAD.Console.PrintLog(f"requests: {len(self.requests)}")
+        FreeCAD.Console.PrintLog(f"requests initially: {len(self.requests)}")
 
         count = 0
 
         while self.requests:
             if current_thread.isInterruptionRequested():
-                for request in self.requests:
-                    FreeCAD.Console.PrintLog(f"request: {request.url()}")
-                    NetworkManager.AM_NETWORK_MANAGER.abort(request)
+                for i in self.requests:
+                    print(f"  request: {i}: {self.requests[i][0]}")
+                    NetworkManager.AM_NETWORK_MANAGER.abort()
                 return
             # FreeCAD.Console.PrintLog(f"processEvents: {self.requests}\n")
             # 50 ms maximum between checks for interruption
             count += 1
             print(f"len(requests): {len(self.requests)}, {count}")
             time.sleep(1)
-            # for i in self.requests:
-            #     print(f"  request: {i}: {self.requests[i][0]}")
+            for i in self.requests:
+                # print(f"  request: {i}: {self.requests[i][0]}")
+                print(f"  request: {i}")
             QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 50)
 
         # This set contains one copy of each of the repos that got some kind of data in
