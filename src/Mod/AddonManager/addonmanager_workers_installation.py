@@ -28,6 +28,7 @@
 
 import io
 import os
+import time
 import queue
 import shutil
 import subprocess
@@ -133,9 +134,10 @@ class UpdateMetadataCacheWorker(QtCore.QThread):
             # 50 ms maximum between checks for interruption
             count += 1
             print(f"len(requests): {len(self.requests)}, {count}")
+            time.sleep(1)
             # for i in self.requests:
             #     print(f"  request: {i}: {self.requests[i][0]}")
-            QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 1000)
+            QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 50)
 
         # This set contains one copy of each of the repos that got some kind of data in
         # this process. For those repos, tell the main Addon Manager code that it needs
