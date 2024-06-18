@@ -1876,7 +1876,7 @@ void SketchObject::transferFilletConstraints(int geoId1, PointPos posId1, int ge
     }
 
     // Add a vertex to preserve the original intersection of the filleted lines
-    Part::GeomPoint* originalCorner = new Part::GeomPoint(getPoint(geoId1, posId1));
+    auto* originalCorner = new Part::GeomPoint(getPoint(geoId1, posId1));
     int originalCornerId = addGeometry(originalCorner);
     delete originalCorner;
 
@@ -2510,10 +2510,10 @@ int SketchObject::fillet(int GeoId1, int GeoId2, const Base::Vector3d& refPnt1,
         Base::Console().Log("radius: %f\n", radius);
 #endif
 
-        Part::GeomOffsetCurve* ocurve1 = new Part::GeomOffsetCurve(
+        auto* ocurve1 = new Part::GeomOffsetCurve(
             Handle(Geom_Curve)::DownCast(curve1->handle()), (sdir1 < 0) ? radius : -radius, vn);
 
-        Part::GeomOffsetCurve* ocurve2 = new Part::GeomOffsetCurve(
+        auto* ocurve2 = new Part::GeomOffsetCurve(
             Handle(Geom_Curve)::DownCast(curve2->handle()), (sdir2 < 0) ? radius : -radius, vn);
 
 #ifdef DEBUG
@@ -4030,7 +4030,7 @@ int SketchObject::join(int geoId1, Sketcher::PointPos posId1, int geoId2, Sketch
                     std::make_move_iterator(mults2.begin()),
                     std::make_move_iterator(mults2.end()));
 
-    Part::GeomBSplineCurve* newSpline = new Part::GeomBSplineCurve(
+    auto* newSpline = new Part::GeomBSplineCurve(
         newPoles, newWeights, newKnots, newMults, bsp1->getDegree(), false, true);
 
     int newGeoId = addGeometry(newSpline);
@@ -5215,7 +5215,7 @@ int SketchObject::addCopy(const std::vector<int>& geoIdList, const Base::Vector3
                 if (constraindisplacement) {
 
                     // add a construction line
-                    Part::GeomLineSegment* constrline = new Part::GeomLineSegment();
+                    auto* constrline = new Part::GeomLineSegment();
 
                     // position of the reference point
                     Base::Vector3d sp = getPoint(refgeoid, refposId)
@@ -5605,12 +5605,12 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         Base::Vector3d focus2P = center - df * majdir;
 
         if (!major) {
-            Part::GeomLineSegment* lmajor = new Part::GeomLineSegment();
+            auto* lmajor = new Part::GeomLineSegment();
             lmajor->setPoints(majorpositiveend, majornegativeend);
 
             igeo.push_back(lmajor);
 
-            Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+            auto* newConstr = new Sketcher::Constraint();
             newConstr->Type = Sketcher::InternalAlignment;
             newConstr->AlignmentType = EllipseMajorDiameter;
             newConstr->First = currentgeoid + incrgeo + 1;
@@ -5620,12 +5620,12 @@ int SketchObject::exposeInternalGeometry(int GeoId)
             incrgeo++;
         }
         if (!minor) {
-            Part::GeomLineSegment* lminor = new Part::GeomLineSegment();
+            auto* lminor = new Part::GeomLineSegment();
             lminor->setPoints(minorpositiveend, minornegativeend);
 
             igeo.push_back(lminor);
 
-            Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+            auto* newConstr = new Sketcher::Constraint();
             newConstr->Type = Sketcher::InternalAlignment;
             newConstr->AlignmentType = EllipseMinorDiameter;
             newConstr->First = currentgeoid + incrgeo + 1;
@@ -5635,12 +5635,12 @@ int SketchObject::exposeInternalGeometry(int GeoId)
             incrgeo++;
         }
         if (!focus1) {
-            Part::GeomPoint* pf1 = new Part::GeomPoint();
+            auto* pf1 = new Part::GeomPoint();
             pf1->setPoint(focus1P);
 
             igeo.push_back(pf1);
 
-            Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+            auto* newConstr = new Sketcher::Constraint();
             newConstr->Type = Sketcher::InternalAlignment;
             newConstr->AlignmentType = EllipseFocus1;
             newConstr->First = currentgeoid + incrgeo + 1;
@@ -5651,11 +5651,11 @@ int SketchObject::exposeInternalGeometry(int GeoId)
             incrgeo++;
         }
         if (!focus2) {
-            Part::GeomPoint* pf2 = new Part::GeomPoint();
+            auto* pf2 = new Part::GeomPoint();
             pf2->setPoint(focus2P);
             igeo.push_back(pf2);
 
-            Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+            auto* newConstr = new Sketcher::Constraint();
             newConstr->Type = Sketcher::InternalAlignment;
             newConstr->AlignmentType = EllipseFocus2;
             newConstr->First = currentgeoid + incrgeo + 1;
@@ -5668,14 +5668,16 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         this->addGeometry(igeo, true);
         this->addConstraints(icon);
 
-        for (std::vector<Part::Geometry*>::iterator it = igeo.begin(); it != igeo.end(); ++it) {
-            if (*it)
-                delete *it;
+        for (auto* geo : igeo) {
+            if (geo){
+                delete geo;
+            }
         }
 
-        for (std::vector<Constraint*>::iterator it = icon.begin(); it != icon.end(); ++it) {
-            if (*it)
-                delete *it;
+        for (auto* constr : icon) {
+            if (constr){
+                delete constr;
+            }
         }
 
         icon.clear();
@@ -5689,12 +5691,9 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         bool minor = false;
         bool focus = false;
 
-        const std::vector<Sketcher::Constraint*>& vals = Constraints.getValues();
-
-        for (std::vector<Sketcher::Constraint*>::const_iterator it = vals.begin(); it != vals.end();
-             ++it) {
-            if ((*it)->Type == Sketcher::InternalAlignment && (*it)->Second == GeoId) {
-                switch ((*it)->AlignmentType) {
+        for (const auto* constr : Constraints.getValues()) {
+            if (constr->Type == Sketcher::InternalAlignment && constr->Second == GeoId) {
+                switch (constr->AlignmentType) {
                     case Sketcher::HyperbolaMajor:
                         major = true;
                         break;
@@ -5713,7 +5712,7 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         int currentgeoid = getHighestCurveIndex();
         int incrgeo = 0;
 
-        const Part::GeomArcOfHyperbola* aoh = static_cast<const Part::GeomArcOfHyperbola*>(geo);
+        auto* aoh = static_cast<const Part::GeomArcOfHyperbola*>(geo);
 
         Base::Vector3d center = aoh->getCenter();
         double majord = aoh->getMajorRadius();
@@ -5735,12 +5734,12 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         Base::Vector3d focus1P = center + df * majdir;
 
         if (!major) {
-            Part::GeomLineSegment* lmajor = new Part::GeomLineSegment();
+            auto* lmajor = new Part::GeomLineSegment();
             lmajor->setPoints(majorpositiveend, majornegativeend);
 
             igeo.push_back(lmajor);
 
-            Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+            auto* newConstr = new Sketcher::Constraint();
             newConstr->Type = Sketcher::InternalAlignment;
             newConstr->AlignmentType = Sketcher::HyperbolaMajor;
             newConstr->First = currentgeoid + incrgeo + 1;
@@ -5750,12 +5749,12 @@ int SketchObject::exposeInternalGeometry(int GeoId)
             incrgeo++;
         }
         if (!minor) {
-            Part::GeomLineSegment* lminor = new Part::GeomLineSegment();
+            auto* lminor = new Part::GeomLineSegment();
             lminor->setPoints(minorpositiveend, minornegativeend);
 
             igeo.push_back(lminor);
 
-            Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+            auto* newConstr = new Sketcher::Constraint();
             newConstr->Type = Sketcher::InternalAlignment;
             newConstr->AlignmentType = Sketcher::HyperbolaMinor;
             newConstr->First = currentgeoid + incrgeo + 1;
@@ -5766,12 +5765,12 @@ int SketchObject::exposeInternalGeometry(int GeoId)
             incrgeo++;
         }
         if (!focus) {
-            Part::GeomPoint* pf1 = new Part::GeomPoint();
+            auto* pf1 = new Part::GeomPoint();
             pf1->setPoint(focus1P);
 
             igeo.push_back(pf1);
 
-            Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+            auto* newConstr = new Sketcher::Constraint();
             newConstr->Type = Sketcher::InternalAlignment;
             newConstr->AlignmentType = Sketcher::HyperbolaFocus;
             newConstr->First = currentgeoid + incrgeo + 1;
@@ -5785,13 +5784,17 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         this->addGeometry(igeo, true);
         this->addConstraints(icon);
 
-        for (std::vector<Part::Geometry*>::iterator it = igeo.begin(); it != igeo.end(); ++it)
-            if (*it)
-                delete *it;
+        for (auto* geo : igeo) {
+            if (geo) {
+                delete geo;
+            }
+        }
 
-        for (std::vector<Constraint*>::iterator it = icon.begin(); it != icon.end(); ++it)
-            if (*it)
-                delete *it;
+        for (auto* constr : icon) {
+            if (constr) {
+                delete constr;
+            }
+        }
 
         icon.clear();
         igeo.clear();
@@ -5803,12 +5806,9 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         bool focus = false;
         bool focus_to_vertex = false;
 
-        const std::vector<Sketcher::Constraint*>& vals = Constraints.getValues();
-
-        for (std::vector<Sketcher::Constraint*>::const_iterator it = vals.begin(); it != vals.end();
-             ++it) {
-            if ((*it)->Type == Sketcher::InternalAlignment && (*it)->Second == GeoId) {
-                switch ((*it)->AlignmentType) {
+        for (const auto* constr : Constraints.getValues()) {
+            if (constr->Type == Sketcher::InternalAlignment && constr->Second == GeoId) {
+                switch (constr->AlignmentType) {
                     case Sketcher::ParabolaFocus:
                         focus = true;
                         break;
@@ -5824,7 +5824,7 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         int currentgeoid = getHighestCurveIndex();
         int incrgeo = 0;
 
-        const Part::GeomArcOfParabola* aop = static_cast<const Part::GeomArcOfParabola*>(geo);
+        auto* aop = static_cast<const Part::GeomArcOfParabola*>(geo);
 
         Base::Vector3d center = aop->getCenter();
         Base::Vector3d focusp = aop->getFocus();
@@ -5833,12 +5833,12 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         std::vector<Constraint*> icon;
 
         if (!focus) {
-            Part::GeomPoint* pf1 = new Part::GeomPoint();
+            auto* pf1 = new Part::GeomPoint();
             pf1->setPoint(focusp);
 
             igeo.push_back(pf1);
 
-            Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+            auto* newConstr = new Sketcher::Constraint();
             newConstr->Type = Sketcher::InternalAlignment;
             newConstr->AlignmentType = Sketcher::ParabolaFocus;
             newConstr->First = currentgeoid + incrgeo + 1;
@@ -5850,12 +5850,12 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         }
 
         if (!focus_to_vertex) {
-            Part::GeomLineSegment* paxis = new Part::GeomLineSegment();
+            auto* paxis = new Part::GeomLineSegment();
             paxis->setPoints(center, focusp);
 
             igeo.push_back(paxis);
 
-            Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+            auto* newConstr = new Sketcher::Constraint();
             newConstr->Type = Sketcher::InternalAlignment;
             newConstr->AlignmentType = Sketcher::ParabolaFocalAxis;
             newConstr->First = currentgeoid + incrgeo + 1;
@@ -5870,14 +5870,16 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         this->addGeometry(igeo, true);
         this->addConstraints(icon);
 
-        for (std::vector<Part::Geometry*>::iterator it = igeo.begin(); it != igeo.end(); ++it) {
-            if (*it)
-                delete *it;
+        for (auto* geo : igeo) {
+            if (geo) {
+                delete geo;
+            }
         }
 
-        for (std::vector<Constraint*>::iterator it = icon.begin(); it != icon.end(); ++it) {
-            if (*it)
-                delete *it;
+        for (auto* constr : icon) {
+            if (constr) {
+                delete constr;
+            }
         }
 
         icon.clear();
@@ -5887,7 +5889,7 @@ int SketchObject::exposeInternalGeometry(int GeoId)
     }
     else if (geo->is<Part::GeomBSplineCurve>()) {
 
-        const Part::GeomBSplineCurve* bsp = static_cast<const Part::GeomBSplineCurve*>(geo);
+        auto* bsp = static_cast<const Part::GeomBSplineCurve*>(geo);
         // First we search what has to be restored
         std::vector<bool> controlpoints(bsp->countPoles());
         std::vector<int> controlpointgeoids(bsp->countPoles());
@@ -5917,17 +5919,16 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         const std::vector<Sketcher::Constraint*>& vals = Constraints.getValues();
 
         // search for existing poles
-        for (std::vector<Sketcher::Constraint*>::const_iterator it = vals.begin(); it != vals.end();
-             ++it) {
-            if ((*it)->Type == Sketcher::InternalAlignment && (*it)->Second == GeoId) {
-                switch ((*it)->AlignmentType) {
+        for (const auto* constr : vals) {
+            if (constr->Type == Sketcher::InternalAlignment && constr->Second == GeoId) {
+                switch (constr->AlignmentType) {
                     case Sketcher::BSplineControlPoint:
-                        controlpoints[(*it)->InternalAlignmentIndex] = true;
-                        controlpointgeoids[(*it)->InternalAlignmentIndex] = (*it)->First;
+                        controlpoints[constr->InternalAlignmentIndex] = true;
+                        controlpointgeoids[constr->InternalAlignmentIndex] = constr->First;
                         break;
                     case Sketcher::BSplineKnotPoint:
-                        knotpoints[(*it)->InternalAlignmentIndex] = true;
-                        knotgeoids[(*it)->InternalAlignmentIndex] = (*it)->First;
+                        knotpoints[constr->InternalAlignmentIndex] = true;
+                        knotgeoids[constr->InternalAlignmentIndex] = constr->First;
                         break;
                     default:
                         return -1;
@@ -5937,10 +5938,8 @@ int SketchObject::exposeInternalGeometry(int GeoId)
 
         if (controlpoints[0]) {
             // search for first pole weight constraint
-            for (std::vector<Sketcher::Constraint*>::const_iterator it = vals.begin();
-                 it != vals.end();
-                 ++it) {
-                if ((*it)->Type == Sketcher::Weight && (*it)->First == controlpointgeoids[0]) {
+            for (const auto* constr : vals) {
+                if (constr->Type == Sketcher::Weight && constr->First == controlpointgeoids[0]) {
                     isfirstweightconstrained = true;
                 }
             }
@@ -5966,13 +5965,13 @@ int SketchObject::exposeInternalGeometry(int GeoId)
 
             if (!(*itb))// if controlpoint not existing
             {
-                Part::GeomCircle* pc = new Part::GeomCircle();
+                auto* pc = new Part::GeomCircle();
                 pc->setCenter(poles[index]);
                 pc->setRadius(distance_p0_p1 / 6);
 
                 igeo.push_back(pc);
 
-                Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+                auto* newConstr = new Sketcher::Constraint();
                 newConstr->Type = Sketcher::InternalAlignment;
                 newConstr->AlignmentType = Sketcher::BSplineControlPoint;
                 newConstr->First = currentgeoid + incrgeo + 1;
@@ -5986,7 +5985,7 @@ int SketchObject::exposeInternalGeometry(int GeoId)
                     if (isfirstweightconstrained && weights[0] == weights[index]) {
                         // if pole-weight newly created AND first weight is radius-constrained,
                         // AND these weights are equal, constrain them to be equal
-                        Sketcher::Constraint* newConstr2 = new Sketcher::Constraint();
+                        auto* newConstr2 = new Sketcher::Constraint();
                         newConstr2->Type = Sketcher::Equal;
                         newConstr2->First = currentgeoid + incrgeo + 1;
                         newConstr2->FirstPos = Sketcher::PointPos::none;
@@ -6000,7 +5999,7 @@ int SketchObject::exposeInternalGeometry(int GeoId)
                     controlpointgeoids[0] = currentgeoid + incrgeo + 1;
                     if (weights[0] == 1.0) {
                         // if the first weight is 1.0 it's probably going to be non-rational
-                        Sketcher::Constraint* newConstr3 = new Sketcher::Constraint();
+                        auto* newConstr3 = new Sketcher::Constraint();
                         newConstr3->Type = Sketcher::Weight;
                         newConstr3->First = controlpointgeoids[0];
                         newConstr3->setValue(weights[0]);
@@ -6022,13 +6021,13 @@ int SketchObject::exposeInternalGeometry(int GeoId)
 
             if (!(*itb))// if knot point not existing
             {
-                Part::GeomPoint* kp = new Part::GeomPoint();
+                auto* kp = new Part::GeomPoint();
 
                 kp->setPoint(bsp->pointAtParameter(knots[index]));
 
                 igeo.push_back(kp);
 
-                Sketcher::Constraint* newConstr = new Sketcher::Constraint();
+                auto* newConstr = new Sketcher::Constraint();
                 newConstr->Type = Sketcher::InternalAlignment;
                 newConstr->AlignmentType = Sketcher::BSplineKnotPoint;
                 newConstr->First = currentgeoid + incrgeo + 1;
@@ -6047,13 +6046,17 @@ int SketchObject::exposeInternalGeometry(int GeoId)
         this->addGeometry(igeo, true);
         this->addConstraints(icon);
 
-        for (std::vector<Part::Geometry*>::iterator it = igeo.begin(); it != igeo.end(); ++it)
-            if (*it)
-                delete *it;
+        for (auto* geo : igeo) {
+            if (geo) {
+                delete geo;
+            }
+        }
 
-        for (std::vector<Constraint*>::iterator it = icon.begin(); it != icon.end(); ++it)
-            if (*it)
-                delete *it;
+        for (auto* constr : icon) {
+            if (constr) {
+                delete constr;
+            }
+        }
 
         icon.clear();
         igeo.clear();
@@ -6174,15 +6177,14 @@ int SketchObject::deleteUnusedInternalGeometry(int GeoId, bool delgeoid)
 
         const std::vector<Sketcher::Constraint*>& vals = Constraints.getValues();
 
-        for (std::vector<Sketcher::Constraint*>::const_iterator it = vals.begin(); it != vals.end();
-             ++it) {
-            if ((*it)->Type == Sketcher::InternalAlignment && (*it)->Second == GeoId) {
-                switch ((*it)->AlignmentType) {
+        for (const auto* constr : vals) {
+            if (constr->Type == Sketcher::InternalAlignment && constr->Second == GeoId) {
+                switch (constr->AlignmentType) {
                     case Sketcher::ParabolaFocus:
-                        focus1elementindex = (*it)->First;
+                        focus1elementindex = constr->First;
                         break;
                     case Sketcher::ParabolaFocalAxis:
-                        majorelementindex = (*it)->First;
+                        majorelementindex = constr->First;
                         break;
                     default:
                         return -1;
@@ -6196,28 +6198,30 @@ int SketchObject::deleteUnusedInternalGeometry(int GeoId, bool delgeoid)
         int majorconstraints = 0;
         int focus1constraints = 0;
 
-        for (std::vector<Sketcher::Constraint*>::const_iterator it = vals.begin(); it != vals.end();
-             ++it) {
-            if ((*it)->Second == majorelementindex || (*it)->First == majorelementindex
-                || (*it)->Third == majorelementindex)
+        for (const auto* constr : vals) {
+            if (constr->Second == majorelementindex || constr->First == majorelementindex
+                || constr->Third == majorelementindex)
                 majorconstraints++;
-            else if ((*it)->Second == focus1elementindex || (*it)->First == focus1elementindex
-                     || (*it)->Third == focus1elementindex)
+            else if (constr->Second == focus1elementindex || constr->First == focus1elementindex
+                     || constr->Third == focus1elementindex)
                 focus1constraints++;
         }
 
         std::vector<int> delgeometries;
 
         // major has minimum one constraint, the specific internal alignment constraint
-        if (majorelementindex != -1 && majorconstraints < 2)
+        if (majorelementindex != -1 && majorconstraints < 2) {
             delgeometries.push_back(majorelementindex);
+        }
 
         // focus has minimum one constraint now, the specific internal alignment constraint
-        if (focus1elementindex != -1 && focus1constraints < 2)
+        if (focus1elementindex != -1 && focus1constraints < 2) {
             delgeometries.push_back(focus1elementindex);
+        }
 
-        if (delgeoid)
+        if (delgeoid){
             delgeometries.push_back(GeoId);
+        }
 
         // indices over an erased element get automatically updated!!
         std::sort(delgeometries.begin(), delgeometries.end());
@@ -6238,7 +6242,7 @@ int SketchObject::deleteUnusedInternalGeometry(int GeoId, bool delgeoid)
     }
     else if (geo->is<Part::GeomBSplineCurve>()) {
 
-        const Part::GeomBSplineCurve* bsp = static_cast<const Part::GeomBSplineCurve*>(geo);
+        auto* bsp = static_cast<const Part::GeomBSplineCurve*>(geo);
 
         // First we search existing IA
         std::vector<int> controlpointgeoids(bsp->countPoles());
@@ -6267,15 +6271,14 @@ int SketchObject::deleteUnusedInternalGeometry(int GeoId, bool delgeoid)
         const std::vector<Sketcher::Constraint*>& vals = Constraints.getValues();
 
         // search for existing poles
-        for (std::vector<Sketcher::Constraint*>::const_iterator jt = vals.begin(); jt != vals.end();
-             ++jt) {
-            if ((*jt)->Type == Sketcher::InternalAlignment && (*jt)->Second == GeoId) {
-                switch ((*jt)->AlignmentType) {
+        for (const auto* constr : vals) {
+            if (constr->Type == Sketcher::InternalAlignment && constr->Second == GeoId) {
+                switch (constr->AlignmentType) {
                     case Sketcher::BSplineControlPoint:
-                        controlpointgeoids[(*jt)->InternalAlignmentIndex] = (*jt)->First;
+                        controlpointgeoids[constr->InternalAlignmentIndex] = constr->First;
                         break;
                     case Sketcher::BSplineKnotPoint:
-                        knotgeoids[(*jt)->InternalAlignmentIndex] = (*jt)->First;
+                        knotgeoids[constr->InternalAlignmentIndex] = constr->First;
                         break;
                     default:
                         return -1;
@@ -6331,11 +6334,9 @@ int SketchObject::deleteUnusedInternalGeometry(int GeoId, bool delgeoid)
              ++it, ++ita) {
             if ((*it) != -1) {
                 // look for a point at geoid index
-                for (std::vector<Sketcher::Constraint*>::const_iterator itc = vals.begin();
-                     itc != vals.end();
-                     ++itc) {
-                    if ((*itc)->Second == (*it) || (*itc)->First == (*it)
-                        || (*itc)->Third == (*it)) {
+                for (const auto* constr : vals) {
+                    if (constr->Second == (*it) || constr->First == (*it)
+                        || constr->Third == (*it)) {
                         (*ita)++;
                     }
                 }
@@ -6347,8 +6348,9 @@ int SketchObject::deleteUnusedInternalGeometry(int GeoId, bool delgeoid)
         }
 
 
-        if (delgeoid)
+        if (delgeoid){
             delgeometries.push_back(GeoId);
+        }
 
         int ndeleted = delGeometriesExclusiveList(delgeometries);
 
@@ -6374,7 +6376,7 @@ bool SketchObject::convertToNURBS(int GeoId)
     if (geo->is<Part::GeomPoint>())
         return false;
 
-    const Part::GeomCurve* geo1 = static_cast<const Part::GeomCurve*>(geo);
+    auto* geo1 = static_cast<const Part::GeomCurve*>(geo);
 
     Part::GeomBSplineCurve* bspline;
 
@@ -6382,7 +6384,7 @@ bool SketchObject::convertToNURBS(int GeoId)
         bspline = geo1->toNurbs(geo1->getFirstParameter(), geo1->getLastParameter());
 
         if (geo1->isDerivedFrom(Part::GeomArcOfConic::getClassTypeId())) {
-            const Part::GeomArcOfConic* geoaoc = static_cast<const Part::GeomArcOfConic*>(geo1);
+            auto* geoaoc = static_cast<const Part::GeomArcOfConic*>(geo1);
 
             if (geoaoc->isReversed())
                 bspline->reverse();
@@ -7350,12 +7352,12 @@ Part::Geometry* projectLine(const BRepAdaptor_Curve& curve, const Handle(Geom_Pl
 
     if (Base::DistanceP2(p1, p2) < Precision::SquareConfusion()) {
         Base::Vector3d p = (p1 + p2) / 2;
-        Part::GeomPoint* point = new Part::GeomPoint(p);
+        auto* point = new Part::GeomPoint(p);
         GeometryFacade::setConstruction(point, true);
         return point;
     }
     else {
-        Part::GeomLineSegment* line = new Part::GeomLineSegment();
+        auto* line = new Part::GeomLineSegment();
         line->setPoints(p1, p2);
         GeometryFacade::setConstruction(line, true);
         return line;
@@ -7492,8 +7494,8 @@ void SketchObject::rebuildExternalGeometry()
         if (*it)
             delete *it;
     ExternalGeo.clear();
-    Part::GeomLineSegment* HLine = new Part::GeomLineSegment();
-    Part::GeomLineSegment* VLine = new Part::GeomLineSegment();
+    auto* HLine = new Part::GeomLineSegment();
+    auto* VLine = new Part::GeomLineSegment();
     HLine->setPoints(Base::Vector3d(0, 0, 0), Base::Vector3d(1, 0, 0));
     VLine->setPoints(Base::Vector3d(0, 0, 0), Base::Vector3d(0, 1, 0));
     GeometryFacade::setConstruction(HLine, true);
@@ -7512,7 +7514,7 @@ void SketchObject::rebuildExternalGeometry()
         }
         else if (Obj->isDerivedFrom<Part::Feature>()) {
             try {
-                const Part::Feature* refObj = static_cast<const Part::Feature*>(Obj);
+                auto* refObj = static_cast<const Part::Feature*>(Obj);
                 const Part::TopoShape& refShape = refObj->Shape.getShape();
                 refSubShape = refShape.getSubShape(SubElement.c_str());
             }
@@ -7606,11 +7608,11 @@ void SketchObject::rebuildExternalGeometry()
                     if (vec1.IsNormal(vec2, Precision::Angular())) {
                         if (beg.SquareDistance(end) < Precision::SquareConfusion()) {
                             Base::Vector3d p = (vBeg + vEnd) / 2;
-                            Part::GeomPoint* point = new Part::GeomPoint(p);
+                            auto* point = new Part::GeomPoint(p);
                             ExternalGeo.push_back(point);
                         }
                         else {
-                            Part::GeomLineSegment* line = new Part::GeomLineSegment();
+                            auto* line = new Part::GeomLineSegment();
                             line->setPoints(vBeg, vEnd);
                             GeometryFacade::setConstruction(line, true);
                             ExternalGeo.push_back(line);
@@ -7631,14 +7633,14 @@ void SketchObject::rebuildExternalGeometry()
                         circle.Transform(mov);
 
                         if (curve.IsClosed()) {
-                            Part::GeomCircle* gCircle = new Part::GeomCircle();
+                            auto* gCircle = new Part::GeomCircle();
                             gCircle->setRadius(circle.Radius());
                             gCircle->setCenter(Base::Vector3d(cnt.X(), cnt.Y(), cnt.Z()));
                             GeometryFacade::setConstruction(gCircle, true);
                             ExternalGeo.push_back(gCircle);
                         }
                         else {
-                            Part::GeomArcOfCircle* gArc = new Part::GeomArcOfCircle();
+                            auto* gArc = new Part::GeomArcOfCircle();
                             Handle(Geom_Curve) hCircle = new Geom_Circle(circle);
                             Handle(Geom_TrimmedCurve) tCurve = new Geom_TrimmedCurve(
                                 hCircle, curve.FirstParameter(), curve.LastParameter());
@@ -7660,7 +7662,7 @@ void SketchObject::rebuildExternalGeometry()
                             gp_Dir dirOrientation = gp_Dir(vec1 ^ vec2);
                             gp_Dir dirLine(dirOrientation);
 
-                            Part::GeomLineSegment* projectedSegment = new Part::GeomLineSegment();
+                            auto* projectedSegment = new Part::GeomLineSegment();
                             Geom_Line ligne(cnt, dirLine);// helper object to compute end points
                             gp_Pnt P1, P2;                // end points of the segment, OCC style
 
@@ -7706,13 +7708,13 @@ void SketchObject::rebuildExternalGeometry()
                             Handle(Geom_Ellipse) hEllipse =
                                 new Geom_Ellipse(refFrameEllipse, origCircle.Radius(), minorRadius);
                             if (curve.IsClosed()) {
-                                Part::GeomEllipse* ellipse = new Part::GeomEllipse();
+                                auto* ellipse = new Part::GeomEllipse();
                                 ellipse->setHandle(hEllipse);
                                 GeometryFacade::setConstruction(ellipse, true);
                                 ExternalGeo.push_back(ellipse);
                             }
                             else {
-                                Part::GeomArcOfEllipse* aoe = new Part::GeomArcOfEllipse();
+                                auto* aoe = new Part::GeomArcOfEllipse();
                                 GeomAPI_ProjectPointOnCurve pFirst(beg, hEllipse);
                                 GeomAPI_ProjectPointOnCurve pLast(end, hEllipse);
                                 Handle(Geom_TrimmedCurve) tCurve =
@@ -7792,12 +7794,12 @@ void SketchObject::rebuildExternalGeometry()
                             destCurveAx2, 0.5 * (rDest + RDest));
 
                         if (curve.IsClosed()) {
-                            Part::GeomCircle* circle = new Part::GeomCircle(hCircle);
+                            auto* circle = new Part::GeomCircle(hCircle);
                             GeometryFacade::setConstruction(circle, true);
                             ExternalGeo.push_back(circle);
                         }
                         else {
-                            Part::GeomArcOfCircle* arc = new Part::GeomArcOfCircle();
+                            auto* arc = new Part::GeomArcOfCircle();
                             GeomAPI_ProjectPointOnCurve pFirst(beg, hCircle);
                             GeomAPI_ProjectPointOnCurve pLast(end, hCircle);
                             Handle(Geom_TrimmedCurve) tCurve =
@@ -7814,7 +7816,7 @@ void SketchObject::rebuildExternalGeometry()
                         gp_Vec start = gp_Vec(destCenter.XYZ()) + destAxisMajor;
                         gp_Vec end = gp_Vec(destCenter.XYZ()) - destAxisMajor;
 
-                        Part::GeomLineSegment* projectedSegment = new Part::GeomLineSegment();
+                        auto* projectedSegment = new Part::GeomLineSegment();
                         projectedSegment->setPoints(
                             Base::Vector3d(start.X(), start.Y(), start.Z()),
                             Base::Vector3d(end.X(), end.Y(), end.Z()));
@@ -7826,13 +7828,13 @@ void SketchObject::rebuildExternalGeometry()
                             destCurveAx2, destAxisMajor.Magnitude(), destAxisMinor.Magnitude());
 
                         if (curve.IsClosed()) {
-                            Part::GeomEllipse* ellipse = new Part::GeomEllipse();
+                            auto* ellipse = new Part::GeomEllipse();
                             ellipse->setHandle(hEllipse);
                             GeometryFacade::setConstruction(ellipse, true);
                             ExternalGeo.push_back(ellipse);
                         }
                         else {
-                            Part::GeomArcOfEllipse* aoe = new Part::GeomArcOfEllipse();
+                            auto* aoe = new Part::GeomArcOfEllipse();
                             GeomAPI_ProjectPointOnCurve pFirst(beg, hEllipse);
                             GeomAPI_ProjectPointOnCurve pLast(end, hEllipse);
                             Handle(Geom_TrimmedCurve) tCurve =
@@ -7866,12 +7868,12 @@ void SketchObject::rebuildExternalGeometry()
 
                                     if (P1.SquareDistance(P2) < Precision::SquareConfusion()) {
                                         Base::Vector3d p = (p1 + p2) / 2;
-                                        Part::GeomPoint* point = new Part::GeomPoint(p);
+                                        auto* point = new Part::GeomPoint(p);
                                         GeometryFacade::setConstruction(point, true);
                                         ExternalGeo.push_back(point);
                                     }
                                     else {
-                                        Part::GeomLineSegment* line = new Part::GeomLineSegment();
+                                        auto* line = new Part::GeomLineSegment();
                                         line->setPoints(p1, p2);
                                         GeometryFacade::setConstruction(line, true);
                                         ExternalGeo.push_back(line);
@@ -7884,7 +7886,7 @@ void SketchObject::rebuildExternalGeometry()
                                     gp_Pnt P2 = projCurve.Value(projCurve.LastParameter());
 
                                     if (P1.SquareDistance(P2) < Precision::SquareConfusion()) {
-                                        Part::GeomCircle* circle = new Part::GeomCircle();
+                                        auto* circle = new Part::GeomCircle();
                                         circle->setRadius(c.Radius());
                                         circle->setCenter(Base::Vector3d(p.X(), p.Y(), p.Z()));
 
@@ -7892,7 +7894,7 @@ void SketchObject::rebuildExternalGeometry()
                                         ExternalGeo.push_back(circle);
                                     }
                                     else {
-                                        Part::GeomArcOfCircle* arc = new Part::GeomArcOfCircle();
+                                        auto* arc = new Part::GeomArcOfCircle();
                                         Handle(Geom_Curve) curve = new Geom_Circle(c);
                                         Handle(Geom_TrimmedCurve) tCurve =
                                             new Geom_TrimmedCurve(curve,
@@ -7904,8 +7906,7 @@ void SketchObject::rebuildExternalGeometry()
                                     }
                                 }
                                 else if (projCurve.GetType() == GeomAbs_BSplineCurve) {
-                                    Part::GeomBSplineCurve* bspline =
-                                        new Part::GeomBSplineCurve(projCurve.BSpline());
+                                    auto* bspline = new Part::GeomBSplineCurve(projCurve.BSpline());
                                     GeometryFacade::setConstruction(bspline, true);
                                     ExternalGeo.push_back(bspline);
                                 }
@@ -7920,7 +7921,7 @@ void SketchObject::rebuildExternalGeometry()
                                     gp_Ax2 xdirref(p, normal);
 
                                     if (P1.SquareDistance(P2) < Precision::SquareConfusion()) {
-                                        Part::GeomHyperbola* hyperbola = new Part::GeomHyperbola();
+                                        auto* hyperbola = new Part::GeomHyperbola();
                                         hyperbola->setMajorRadius(e.MajorRadius());
                                         hyperbola->setMinorRadius(e.MinorRadius());
                                         hyperbola->setCenter(Base::Vector3d(p.X(), p.Y(), p.Z()));
@@ -7953,7 +7954,7 @@ void SketchObject::rebuildExternalGeometry()
                                     gp_Ax2 xdirref(p, normal);
 
                                     if (P1.SquareDistance(P2) < Precision::SquareConfusion()) {
-                                        Part::GeomParabola* parabola = new Part::GeomParabola();
+                                        auto* parabola = new Part::GeomParabola();
                                         parabola->setFocal(e.Focal());
                                         parabola->setCenter(Base::Vector3d(p.X(), p.Y(), p.Z()));
                                         parabola->setAngleXU(
@@ -7962,8 +7963,7 @@ void SketchObject::rebuildExternalGeometry()
                                         ExternalGeo.push_back(parabola);
                                     }
                                     else {
-                                        Part::GeomArcOfParabola* aop =
-                                            new Part::GeomArcOfParabola();
+                                        auto* aop = new Part::GeomArcOfParabola();
                                         Handle(Geom_Curve) curve = new Geom_Parabola(e);
                                         Handle(Geom_TrimmedCurve) tCurve =
                                             new Geom_TrimmedCurve(curve,
@@ -7984,14 +7984,14 @@ void SketchObject::rebuildExternalGeometry()
                                     gp_Ax2 xdirref(p, normal);
 
                                     if (P1.SquareDistance(P2) < Precision::SquareConfusion()) {
-                                        Part::GeomEllipse* ellipse = new Part::GeomEllipse();
+                                        auto* ellipse = new Part::GeomEllipse();
                                         Handle(Geom_Ellipse) curve = new Geom_Ellipse(e);
                                         ellipse->setHandle(curve);
                                         GeometryFacade::setConstruction(ellipse, true);
                                         ExternalGeo.push_back(ellipse);
                                     }
                                     else {
-                                        Part::GeomArcOfEllipse* aoe = new Part::GeomArcOfEllipse();
+                                        auto* aoe = new Part::GeomArcOfEllipse();
                                         Handle(Geom_Curve) curve = new Geom_Ellipse(e);
                                         Handle(Geom_TrimmedCurve) tCurve =
                                             new Geom_TrimmedCurve(curve,
@@ -8021,7 +8021,7 @@ void SketchObject::rebuildExternalGeometry()
                 Base::Vector3d p(P.X(), P.Y(), P.Z());
                 invPlm.multVec(p, p);
 
-                Part::GeomPoint* point = new Part::GeomPoint(p);
+                auto* point = new Part::GeomPoint(p);
                 GeometryFacade::setConstruction(point, true);
                 ExternalGeo.push_back(point);
             } break;
