@@ -136,9 +136,23 @@ bool ViewProviderAssembly::canDragObject(App::DocumentObject* obj) const
         return false;
     }
 
-    // else if a solid is removed, remove associated joints if any.
+    return true;
+}
+
+bool ViewProviderAssembly::canDragObjectToTarget(App::DocumentObject* obj,
+                                                 App::DocumentObject* target) const
+{
+    // If a solid is removed from the assembly, its joints need to be removed.
     bool prompted = false;
     auto* assemblyPart = static_cast<AssemblyObject*>(getObject());
+
+    if (target && assemblyPart->hasObject(target)) {
+        // If the obj stays in assembly then its ok.
+        return true;
+    }
+
+    // If target is null then it's being dropped on a doc.
+
     std::vector<App::DocumentObject*> joints = assemblyPart->getJoints();
 
     // Combine the joints and groundedJoints vectors into one for simplicity.
@@ -146,7 +160,6 @@ bool ViewProviderAssembly::canDragObject(App::DocumentObject* obj) const
     std::vector<App::DocumentObject*> groundedJoints = assemblyPart->getGroundedJoints();
     allJoints.insert(allJoints.end(), groundedJoints.begin(), groundedJoints.end());
 
-    Gui::Command::openCommand(tr("Delete associated joints").toStdString().c_str());
     for (auto joint : allJoints) {
         // getLinkObjFromProp returns nullptr if the property doesn't exist.
         App::DocumentObject* obj1 = AssemblyObject::getObjFromNameProp(joint, "Object1", "Part1");
@@ -174,7 +187,6 @@ bool ViewProviderAssembly::canDragObject(App::DocumentObject* obj) const
                                     joint->getNameInDocument());
         }
     }
-    Gui::Command::commitCommand();
 
     return true;
 }
