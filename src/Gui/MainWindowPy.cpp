@@ -56,6 +56,7 @@ void MainWindowPy::init_type()
     add_varargs_method("getActiveWindow", &MainWindowPy::getActiveWindow, "getActiveWindow()");
     add_varargs_method("addWindow", &MainWindowPy::addWindow, "addWindow(MDIView)");
     add_varargs_method("removeWindow", &MainWindowPy::removeWindow, "removeWindow(MDIView)");
+    add_noargs_method("consumeReceivedScriptArgs", &MainWindowPy::consumeReceivedScriptArgs, "getReceivedScriptArgs()");
 }
 
 PyObject *MainWindowPy::extension_object_new(struct _typeobject * /*type*/, PyObject * /*args*/, PyObject * /*kwds*/)
@@ -87,7 +88,7 @@ Py::Object MainWindowPy::createWrapper(MainWindow *mw)
     }
 
     // copy attributes
-    std::list<std::string> attr = {"getWindows", "getWindowsOfType", "setActiveWindow", "getActiveWindow", "addWindow", "removeWindow"};
+    std::list<std::string> attr = {"getWindows", "getWindowsOfType", "setActiveWindow", "getActiveWindow", "addWindow", "removeWindow", "consumeReceivedScriptArgs"};
 
     Py::Object py = wrap.fromQWidget(mw, "QMainWindow");
     Py::ExtensionObject<MainWindowPy> inst(create(mw));
@@ -214,4 +215,9 @@ Py::Object MainWindowPy::removeWindow(const Py::Tuple& args)
         _mw->removeWindow(mdi.extensionObject()->getMDIViewPtr());
     }
     return Py::None();
+}
+
+Py::Object MainWindowPy::consumeReceivedScriptArgs()
+{
+    return Py::String(_mw->consumeReceivedScriptArgs());
 }
