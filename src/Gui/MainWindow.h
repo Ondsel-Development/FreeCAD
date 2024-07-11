@@ -202,6 +202,18 @@ public:
     void unsetUrlHandler(const QString &scheme);
     //@}
 
+    /**
+     * @brief Return and consume the string containing received script arguments.
+     *
+     * If the application receives script arguments from a single-instance
+     * instance, this method allows you to acquire those arguments.  It will
+     * also clear the string to make sure a script can distinct whether new
+     * arguments have been passed to it.
+     *
+     * @return the received script arguments.
+     */
+    std::string consumeReceivedScriptArgs();
+
     void updateActions(bool delay = false);
 
     enum StatusType {None, Err, Wrn, Pane, Msg, Log, Tmp, Critical};
@@ -366,6 +378,7 @@ private:
     /// some kind of singleton
     static MainWindow* instance;
     struct MainWindowP* d;
+    std::string receivedScriptArgs;
 };
 
 inline MainWindow* getMainWindow()
