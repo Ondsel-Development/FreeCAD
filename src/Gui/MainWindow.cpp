@@ -1575,10 +1575,17 @@ void MainWindow::processMessages(const QList<QString> & msg)
     try {
         WaitCursor wc;
         std::list<std::string> files;
-        QString action = QString::fromStdString("OpenFile:");
+        QString openFileAction = QString::fromLatin1("OpenFile:");
+        QString scriptArgsAction = QString::fromLatin1("ScriptArgs:");
         for (const auto & it : msg) {
-            if (it.startsWith(action))
-                files.emplace_back(it.mid(action.size()).toStdString());
+            if (it.startsWith(scriptArgsAction)) {
+                // store the received script arguments and overwrite the
+                // previous ones
+                receivedScriptArgs = it.mid(scriptArgsAction.size()).toStdString();
+            }
+            else if (it.startsWith(openFileAction)) {
+                files.emplace_back(it.mid(openFileAction.size()).toStdString());
+            }
         }
         files = App::Application::processFiles(files);
         for (const auto & file : files) {
@@ -2434,6 +2441,13 @@ void MainWindow::loadUrls(App::Document* doc, const QList<QUrl>& urls)
         // if the passed document name doesn't exist the module should create it, if needed
         Application::Instance->importFrom(it.key().toUtf8(), docName, it.value().toLatin1());
     }
+}
+
+std::string MainWindow::consumeReceivedScriptArgs()
+{
+    std::string scriptArgs = receivedScriptArgs;
+    receivedScriptArgs.clear();
+    return scriptArgs;
 }
 
 void MainWindow::changeEvent(QEvent *e)

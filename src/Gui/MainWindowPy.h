@@ -53,6 +53,7 @@ public:
     Py::Object getActiveWindow(const Py::Tuple&);
     Py::Object addWindow(const Py::Tuple&);
     Py::Object removeWindow(const Py::Tuple&);
+    Py::Object consumeReceivedScriptArgs();
 
 private:
     QPointer<MainWindow> _mw;
