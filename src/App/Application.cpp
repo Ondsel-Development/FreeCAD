@@ -2505,6 +2505,18 @@ void processProgramOptions(const variables_map& vm, std::map<std::string,std::st
             }
         }
     }
+
+    if (vm.count("pass")) {
+        std::vector<std::string> args = vm["pass"].as< std::vector<std::string> >();
+        std::ostringstream oss;
+        for (size_t i = 0; i < args.size(); ++i) {
+            if (i != 0) {
+                oss << ' ';
+            }
+            oss << args[i];
+        }
+        mConfig["ScriptArgs"] = oss.str();
+    }
 }
 }
 // clang-format on
