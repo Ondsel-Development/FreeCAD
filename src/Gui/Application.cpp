@@ -2116,32 +2116,50 @@ void Application::runInitGuiScript()
 
 namespace
 {
+void sendScriptArgumentsToServer(const std::map<std::string, std::string>& cfg,
+                                 GUISingleApplication& mainApp)
+{
+    auto it = cfg.find("ScriptArgs");
+    if (it != cfg.end()) {
+        QString msg = QString::fromStdString(it->second);
+        msg.prepend(QString::fromLatin1("ScriptArgs:"));
+        if (!mainApp.sendMessage(msg)) {
+            qWarning("Failed to send ScriptArgs message to server");
+        }
+    }
+}
+
+void sendFileNamesToServer(GUISingleApplication& mainApp)
+{
+    // send the file names to be opened to the server application so that this
+    // opens them
+    QDir cwd = QDir::current();
+    std::list<std::string> files = App::Application::getCmdLineFiles();
+    for (const auto& file : files) {
+        QString fn = QString::fromUtf8(file.c_str(), static_cast<int>(file.size()));
+        QFileInfo fi(fn);
+        // if path name is relative make it absolute because the running instance
+        // cannot determine the full path when trying to load the file
+        if (fi.isRelative()) {
+            fn = cwd.absoluteFilePath(fn);
+            fn = QDir::cleanPath(fn);
+        }
+
+        fn.prepend(QLatin1String("OpenFile:"));
+        if (!mainApp.sendMessage(fn)) {
+            qWarning("Failed to send OpenFile message to server");
+            break;
+        }
+    }
+}
+
 bool onlySingleInstance(GUISingleApplication& mainApp)
 {
     const std::map<std::string, std::string>& cfg = App::Application::Config();
     auto it = cfg.find("SingleInstance");
     if (it != cfg.end() && mainApp.isRunning()) {
-        // send the file names to be opened to the server application so that this
-        // opens them
-        QDir cwd = QDir::current();
-        std::list<std::string> files = App::Application::getCmdLineFiles();
-        for (const auto& file : files) {
-            QString fn = QString::fromUtf8(file.c_str(), static_cast<int>(file.size()));
-            QFileInfo fi(fn);
-            // if path name is relative make it absolute because the running instance
-            // cannot determine the full path when trying to load the file
-            if (fi.isRelative()) {
-                fn = cwd.absoluteFilePath(fn);
-                fn = QDir::cleanPath(fn);
-            }
-
-            fn.prepend(QLatin1String("OpenFile:"));
-            if (!mainApp.sendMessage(fn)) {
-                qWarning("Failed to send OpenFile message to server");
-                break;
-            }
-        }
-
+        sendScriptArgumentsToServer(cfg, mainApp);
+        sendFileNamesToServer(mainApp);
         return true;
     }
 
