@@ -25,6 +25,7 @@
 #define APPLICATION_H
 
 #include <QPixmap>
+#include <QUrl>
 #include <map>
 #include <string>
 
@@ -281,6 +282,8 @@ public:
     std::pair<std::string,std::string> getUserEditModeUIStrings(int mode = -1) const;
     bool setUserEditMode(int mode);
     bool setUserEditMode(const std::string &mode);
+    void registerUrlHandler(std::string urlScheme, PyObject* handler);
+    void executeUrlHandler(QUrl& url);
     //@}
 
 public:
@@ -355,6 +358,7 @@ public:
     static PyObject* sListUserEditModes        (PyObject *self,PyObject *args);
     static PyObject* sGetUserEditMode          (PyObject *self,PyObject *args);
     static PyObject* sSetUserEditMode          (PyObject *self,PyObject *args);
+    static PyObject* sRegisterUrlHandler       (PyObject *self,PyObject *args);
 
     static PyMethodDef    Methods[];
 
@@ -363,6 +367,8 @@ private:
     /// workbench python dictionary
     PyObject*             _pcWorkbenchDictionary;
     NavlibInterface* pNavlibInterface;
+
+    std::unordered_map<std::string, PyObject*> urlHandlers;
 };
 
 } //namespace Gui
