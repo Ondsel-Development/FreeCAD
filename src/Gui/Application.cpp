@@ -21,6 +21,7 @@
  ***************************************************************************/
 
 #include "PreCompiled.h"
+#include "PythonWrapper.h"
 
 #ifndef _PreComp_
 #include <boost/interprocess/sync/file_lock.hpp>
@@ -510,6 +511,8 @@ Application::Application(bool GUIenabled)
                                     module,
                                     "ViewProviderGeometryObject");
         Base::Interpreter().addType(&ViewProviderLinkPy::Type, module, "ViewProviderLink");
+
+        urlHandlers = std::unordered_map<std::string, PyObject*>();
     }
 
     Base::PyGILStateLocker lock;
@@ -1497,6 +1500,49 @@ bool Application::setUserEditMode(const std::string& mode)
         }
     }
     return false;
+}
+
+void Application::registerUrlHandler(std::string urlScheme, PyObject* handler)
+{
+    auto it = urlHandlers.find(urlScheme);
+    if (it != urlHandlers.end()) {
+        // dispose of a previous callback
+        Base::PyGILStateLocker lock;
+        Py_XDECREF(it->second);
+    }
+    urlHandlers[urlScheme] = handler;
+}
+
+void Application::executeUrlHandler(QUrl& url)
+{
+    QString scheme = url.scheme();
+    auto it = urlHandlers.find(scheme.toStdString());
+    if (it != urlHandlers.end()) {
+        Base::PyGILStateLocker lock;
+        Gui::PythonWrapper wrap;
+
+        PyObject* pyUrl = PyUnicode_FromString(url.toString().toStdString().c_str());
+
+        if (pyUrl == nullptr) {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to convert Qt objects to Python objects");
+            return;
+        }
+
+        auto func = it->second;
+        // Create the argument tuple
+        PyObject* arglist = Py_BuildValue("(O)", pyUrl);
+
+        PyObject* result = PyObject_CallObject(func, arglist);
+
+        if (result == nullptr) {
+            PyErr_Print();
+        }
+        else {
+            Py_DECREF(result);
+        }
+
+        Py_DECREF(arglist);
+    }
 }
 
 /**
