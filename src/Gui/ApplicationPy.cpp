@@ -407,6 +407,13 @@ PyMethodDef Application::Methods[] = {
    "Remove all children from a group node.\n"
    "\n"
    "node : object"},
+  {"registerUrlHandler", (PyCFunction) Application::sRegisterUrlHandler, METH_VARARGS,
+   "registerUrlHandler(scheme, handler) -> None\n"
+   "\n"
+   "Register a handler (a python function) for URL scheme scheme.\n"
+   "\n"
+   "scheme : str\n"
+   "handler : function"},
   {nullptr, nullptr, 0, nullptr}    /* Sentinel */
 };
 
@@ -1618,4 +1625,26 @@ PyObject* Application::sSetUserEditMode(PyObject * /*self*/, PyObject *args)
     bool ok = Instance->setUserEditMode(std::string(mode));
 
     return Py::new_reference_to(Py::Boolean(ok));
+}
+
+PyObject* Application::sRegisterUrlHandler(PyObject * /*self*/, PyObject *args)
+{
+    const char *name;
+    PyObject* pyFunc;
+
+    if (!PyArg_ParseTuple(args, "sO:set_callback", &name, &pyFunc)) {
+        return nullptr;
+    }
+
+    if (!PyCallable_Check(pyFunc)) {
+        PyErr_SetString(PyExc_TypeError, "Parameter must be callable");
+        throw Py::Exception();
+    }
+
+    std::string cppName(name);
+
+    Py_XINCREF(pyFunc);
+    Instance->registerUrlHandler(cppName, pyFunc);
+
+    Py_Return;
 }

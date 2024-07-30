@@ -159,12 +159,20 @@ void GUIApplication::commitData(QSessionManager &manager)
 bool GUIApplication::event(QEvent * ev)
 {
     if (ev->type() == QEvent::FileOpen) {
-        QString file = static_cast<QFileOpenEvent*>(ev)->file();
-        QFileInfo fi(file);
-        if (fi.suffix().toLower() == QLatin1String("fcstd")) {
-            QByteArray fn = file.toUtf8();
-            Application::Instance->open(fn, "FreeCAD");
-            return true;
+        auto fileOpenEvent = static_cast<QFileOpenEvent*>(ev);
+        QString file = fileOpenEvent->file();
+        if (!file.isEmpty()) {
+            QFileInfo fi(file);
+            if (fi.suffix().toLower() == QLatin1String("fcstd")) {
+                QByteArray fn = file.toUtf8();
+                Application::Instance->open(fn, "FreeCAD");
+                return true;
+            }
+        }
+
+        QUrl url = fileOpenEvent->url();
+        if (url.isValid()) {
+            Application::Instance->executeUrlHandler(url);
         }
     }
 
