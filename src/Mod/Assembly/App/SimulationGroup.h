@@ -21,51 +21,38 @@
  *                                                                          *
  ***************************************************************************/
 
-#include "PreCompiled.h"
 
-#include <Base/Console.h>
-#include <Base/Interpreter.h>
-#include <Base/PyObjectBase.h>
+#ifndef ASSEMBLY_SimulationGroup_H
+#define ASSEMBLY_SimulationGroup_H
 
-#include "ViewProviderAssembly.h"
-#include "ViewProviderBom.h"
-#include "ViewProviderBomGroup.h"
-#include "ViewProviderJointGroup.h"
-#include "ViewProviderViewGroup.h"
-#include "ViewProviderSimulationGroup.h"
+#include <Mod/Assembly/AssemblyGlobal.h>
+
+#include <App/DocumentObjectGroup.h>
+#include <App/PropertyLinks.h>
 
 
-namespace AssemblyGui
+namespace Assembly
 {
-extern PyObject* initModule();
-}
 
-/* Python entry */
-PyMOD_INIT_FUNC(AssemblyGui)
+class AssemblyExport SimulationGroup: public App::DocumentObjectGroup
 {
-    // load dependent module
-    try {
-        Base::Interpreter().runString("import SpreadsheetGui");
+    PROPERTY_HEADER_WITH_OVERRIDE(Assembly::SimulationGroup);
+
+public:
+    SimulationGroup();
+    ~SimulationGroup() override;
+
+    PyObject* getPyObject() override;
+
+    /// returns the type name of the ViewProvider
+    const char* getViewProviderName() const override
+    {
+        return "AssemblyGui::ViewProviderSimulationGroup";
     }
-    catch (const Base::Exception& e) {
-        PyErr_SetString(PyExc_ImportError, e.what());
-        PyMOD_Return(nullptr);
-    }
-
-    PyObject* mod = AssemblyGui::initModule();
-    Base::Console().Log("Loading AssemblyGui module... done\n");
+};
 
 
-    // NOTE: To finish the initialization of our own type objects we must
-    // call PyType_Ready, otherwise we run into a segmentation fault, later on.
-    // This function is responsible for adding inherited slots from a type's base class.
+}  // namespace Assembly
 
-    AssemblyGui::ViewProviderAssembly::init();
-    AssemblyGui::ViewProviderBom::init();
-    AssemblyGui::ViewProviderBomGroup::init();
-    AssemblyGui::ViewProviderJointGroup::init();
-    AssemblyGui::ViewProviderViewGroup::init();
-    AssemblyGui::ViewProviderSimulationGroup::init();
 
-    PyMOD_Return(mod);
-}
+#endif  // ASSEMBLY_SimulationGroup_H

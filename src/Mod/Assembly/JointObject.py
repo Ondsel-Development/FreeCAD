@@ -40,6 +40,23 @@ from pivy import coin
 import UtilsAssembly
 import Preferences
 
+try:
+    import sys,os,traceback,inspect
+    from datetime import datetime
+except ImportError:
+    App.Console.PrintError("\n\nSeems the python standard libs are not installed, bailing out!\n\n")
+    raise
+
+def trace():
+    print("Trace Begin")
+    # logger = App.Logger('MyModule')
+    # logger.info('log test {}',1)
+    # App.setLogLevel('MyModule','Trace')
+    # logger.trace('trace test {}',1)
+    lines = traceback.format_stack()
+    for i in range(0, len(lines) - 1):
+        print(lines[i].strip().split('\n', 1)[0])
+
 translate = App.Qt.translate
 
 TranslatedJointTypes = [
@@ -400,7 +417,7 @@ class Joint:
                     "This is the minimum limit for the angle between both coordinate systems (between their X axis).",
                 ),
             )
-
+            
         if not hasattr(joint, "AngleMax"):
             joint.addProperty(
                 "App::PropertyFloat",
@@ -409,6 +426,28 @@ class Joint:
                 QT_TRANSLATE_NOOP(
                     "App::Property",
                     "This is the maximum limit for the angle between both coordinate systems (between their X axis).",
+                ),
+            )
+
+        if not hasattr(joint, "LinearMotionFormula"):
+            joint.addProperty(
+                "App::PropertyString",
+                "LinearMotionFormula",
+                "Motions",
+                QT_TRANSLATE_NOOP(
+                    "App::Property",
+                    "Linear Motion function of time.",
+                ),
+            )
+
+        if not hasattr(joint, "AngularMotionFormula"):
+            joint.addProperty(
+                "App::PropertyString",
+                "AngularMotionFormula",
+                "Motions",
+                QT_TRANSLATE_NOOP(
+                    "App::Property",
+                    "Angular Motion function of time.",
                 ),
             )
 
@@ -1295,7 +1334,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
             self.assembly.ViewObject.MoveInCommand = False
 
         self.form = Gui.PySideUic.loadUi(":/panels/TaskAssemblyCreateJoint.ui")
-
+        
         if self.activeType == "Part":
             self.form.setWindowTitle("Match parts")
             self.form.jointType.hide()
@@ -1328,6 +1367,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
             Gui.Selection.clearSelection()
             self.creating = False
             self.joint = jointObj
+            print("self.joint = jointObj")
             self.jointName = jointObj.Label
             App.setActiveTransaction("Edit " + self.jointName + " Joint")
 
@@ -1477,7 +1517,7 @@ class TaskAssemblyCreateJoint(QtCore.QObject):
 
     def onDistanceChanged(self, quantity):
         self.joint.Distance = self.form.distanceSpinbox.property("rawValue")
-
+        
     def onDistance2Changed(self, quantity):
         self.joint.Distance2 = self.form.distanceSpinbox2.property("rawValue")
 

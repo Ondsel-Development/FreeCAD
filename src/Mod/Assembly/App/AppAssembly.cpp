@@ -32,6 +32,7 @@
 #include "BomGroup.h"
 #include "JointGroup.h"
 #include "ViewGroup.h"
+#include "SimulationGroup.h"
 
 
 namespace Assembly
@@ -66,6 +67,7 @@ PyMOD_INIT_FUNC(AssemblyApp)
     Assembly::BomGroup ::init();
     Assembly::JointGroup ::init();
     Assembly::ViewGroup ::init();
+    Assembly::SimulationGroup ::init();
 
     PyMOD_Return(mod);
 }

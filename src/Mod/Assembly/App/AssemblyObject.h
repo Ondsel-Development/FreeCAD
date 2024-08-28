@@ -25,6 +25,7 @@
 #ifndef ASSEMBLY_AssemblyObject_H
 #define ASSEMBLY_AssemblyObject_H
 
+class QTimer;
 
 #include <GeomAbs_CurveType.hxx>
 #include <GeomAbs_SurfaceType.hxx>
@@ -34,6 +35,9 @@
 #include <App/FeaturePython.h>
 #include <App/Part.h>
 #include <App/PropertyLinks.h>
+#include "SimulationGroup.h"
+
+#include <3rdParty/OndselSolver/OndselSolver/enum.h>
 
 namespace MbD
 {
@@ -156,6 +160,11 @@ public:
     and redraw the joints Args : enableRedo : This store initial positions to enable undo while
     being in an active transaction (joint creation).*/
     int solve(bool enableRedo = false, bool updateJCS = true);
+    int createASMT(bool updateJCS = true);
+    int runASMTKinematic();
+    int updateForFrame(size_t index, bool updateJCS = true);
+    size_t numberOfFrames();
+    void displayLastFrame();
     void preDrag(std::vector<App::DocumentObject*> dragParts);
     void doDragStep();
     void postDrag();
@@ -175,6 +184,9 @@ public:
     void ensureIdentityPlacements();
 
     // Ondsel Solver interface
+    void preMbDrun();
+    void updateFromMbD();
+    void outputResults(MbD::AnalysisType type);
     std::shared_ptr<MbD::ASMTAssembly> makeMbdAssembly();
     std::shared_ptr<MbD::ASMTPart>
     makeMbdPart(std::string& name, Base::Placement plc = Base::Placement(), double mass = 1.0);
@@ -193,10 +205,27 @@ public:
     int slidingPartIndex(App::DocumentObject* joint);
 
     void jointParts(std::vector<App::DocumentObject*> joints);
-    JointGroup* getJointGroup() const;
-    ViewGroup* getExplodedViewGroup() const;
-    std::vector<App::DocumentObject*>
-    getJoints(bool updateJCS = true, bool delBadJoints = false, bool subJoints = true);
+    void create_mbdSimulationParameters();
+    JointGroup* getJointGroup();
+    ViewGroup* getExplodedViewGroup();
+    SimulationGroup* getSimulationGroup(const Base::Type& typeId);
+    template<typename T>
+    T* getGroup()
+    {
+        App::Document* doc = getDocument();
+
+        std::vector<DocumentObject*> groups = doc->getObjectsOfType(T::getClassTypeId());
+        if (groups.empty()) {
+            return nullptr;
+        }
+        for (auto group : groups) {
+            if (hasObject(group)) {
+                return dynamic_cast<T*>(group);
+            }
+        }
+        return nullptr;
+    }
+    std::vector<App::DocumentObject*> getJoints(bool updateJCS = true, bool delBadJoints = false);
     std::vector<App::DocumentObject*> getGroundedJoints();
     std::vector<App::DocumentObject*> getJointsOfObj(App::DocumentObject* obj);
     std::vector<App::DocumentObject*> getJointsOfPart(App::DocumentObject* part);
@@ -288,6 +317,7 @@ public:
                                               const std::string& sub);
     static Base::Placement getGlobalPlacement(App::DocumentObject* targetObj,
                                               App::PropertyXLinkSub* prop);
+    QTimer* runKinematicsTimer;
 };
 
 // using AssemblyObjectPython = App::FeaturePythonT<AssemblyObject>;

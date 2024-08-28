@@ -574,6 +574,20 @@ def getViewGroup(assembly):
     return view_group
 
 
+def getSimulationGroup(assembly):
+    sim_group = None
+
+    for obj in assembly.OutList:
+        if obj.TypeId == "Assembly::SimulationGroup":
+            sim_group = obj
+            break
+
+    if not sim_group:
+        sim_group = assembly.newObject("Assembly::SimulationGroup", "Simulations")
+
+    return sim_group
+
+
 def isAssemblyGrounded():
     assembly = activeAssembly()
     if not assembly:
