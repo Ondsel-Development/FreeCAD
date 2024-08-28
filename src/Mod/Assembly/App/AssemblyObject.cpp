@@ -35,6 +35,10 @@
 #include <vector>
 #include <unordered_map>
 #endif
+#include <QTimer>
+
+#include <thread>
+#include <chrono>
 
 #include <App/Application.h>
 #include <App/Document.h>
@@ -77,15 +81,20 @@
 #include <OndselSolver/ASMTRackPinionJoint.h>
 #include <OndselSolver/ASMTRotationLimit.h>
 #include <OndselSolver/ASMTTranslationLimit.h>
+#include <OndselSolver/ASMTRotationalMotion.h>
+#include <OndselSolver/ASMTTranslationalMotion.h>
 #include <OndselSolver/ASMTScrewJoint.h>
 #include <OndselSolver/ASMTSphSphJoint.h>
 #include <OndselSolver/ASMTTime.h>
 #include <OndselSolver/ASMTConstantGravity.h>
+#include <OndselSolver/ExternalSystem.h>
+#include <OndselSolver/enum.h>
 
 #include "AssemblyObject.h"
 #include "AssemblyObjectPy.h"
 #include "JointGroup.h"
 #include "ViewGroup.h"
+#include "SimulationGroup.h"
 
 namespace PartApp = Part;
 
@@ -150,7 +159,9 @@ PROPERTY_SOURCE(Assembly::AssemblyObject, App::Part)
 
 AssemblyObject::AssemblyObject()
     : mbdAssembly(std::make_shared<ASMTAssembly>())
-{}
+{
+    mbdAssembly->externalSystem->freecadAssemblyObject = this;
+}
 
 AssemblyObject::~AssemblyObject() = default;
 
@@ -169,7 +180,7 @@ App::DocumentObjectExecReturn* AssemblyObject::execute()
 
     ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Assembly");
-    if (hGrp->GetBool("SolveOnRecompute", true)) {
+    if (hGrp->GetBool("SolveOnRecompute", false)) {
         solve();
     }
     return ret;
@@ -193,13 +204,15 @@ int AssemblyObject::solve(bool enableRedo, bool updateJCS)
     removeUnconnectedJoints(joints, groundedObjs);
 
     jointParts(joints);
+    create_mbdSimulationParameters();
 
     if (enableRedo) {
         savePlacementsForUndo();
     }
 
     try {
-        mbdAssembly->runPreDrag();  // solve() is causing some issues with limits.
+        //mbdAssembly->runPreDrag();  // solve() is causing some issues with limits.
+        mbdAssembly->runKINEMATIC();
     }
     catch (...) {
         Base::Console().Error("Solve failed\n");
@@ -211,6 +224,58 @@ int AssemblyObject::solve(bool enableRedo, bool updateJCS)
     redrawJointPlacements(joints);
 
     return 0;
+}
+
+int Assembly::AssemblyObject::createASMT(bool updateJCS)
+{
+    mbdAssembly = makeMbdAssembly();
+    objectPartMap.clear();
+    std::vector<App::DocumentObject*> groundedObjs = fixGroundedParts();
+    if (groundedObjs.empty()) {
+        // If no part fixed we can't solve.
+        return -6;
+    }
+    std::vector<App::DocumentObject*> joints = getJoints(updateJCS);
+    removeUnconnectedJoints(joints, groundedObjs);
+    jointParts(joints);
+    create_mbdSimulationParameters();
+    savePlacementsForUndo();
+    return 0;
+}
+
+int Assembly::AssemblyObject::runASMTKinematic()
+{
+    assert(mbdAssembly);
+    int returnCode = 0;
+    try {
+        mbdAssembly->runKINEMATIC();
+    }
+    catch (...) {
+        Base::Console().Error("Solve failed\n");
+        returnCode = -1;
+    }
+    auto nfrms = mbdAssembly->numberOfFrames();
+    Base::Console().Message("Number of frames output is %d\n", nfrms);
+    return returnCode;
+}
+
+int Assembly::AssemblyObject::updateForFrame(size_t index, bool updateJCS)
+{
+    mbdAssembly->updateForFrame(index);
+    setNewPlacements();
+    auto jointDocs = getJoints(updateJCS);
+    redrawJointPlacements(jointDocs);
+    return 0;
+}
+
+size_t Assembly::AssemblyObject::numberOfFrames()
+{
+    return mbdAssembly->numberOfFrames();
+}
+
+void Assembly::AssemblyObject::displayLastFrame()
+{
+    assert(false);
 }
 
 void AssemblyObject::preDrag(std::vector<App::DocumentObject*> dragParts)
@@ -449,9 +514,27 @@ void AssemblyObject::recomputeJointPlacements(std::vector<App::DocumentObject*> 
     }
 }
 
+void Assembly::AssemblyObject::preMbDrun()
+{
+    // Do nothing.
+}
+
+void Assembly::AssemblyObject::updateFromMbD()
+{
+    // Do nothing.
+}
+
+void Assembly::AssemblyObject::outputResults(MbD::AnalysisType type)
+{
+    //setNewPlacements();
+    //auto jointDocs = getJoints(true);
+    //redrawJointPlacements(jointDocs);
+}
+
 std::shared_ptr<ASMTAssembly> AssemblyObject::makeMbdAssembly()
 {
     auto assembly = CREATE<ASMTAssembly>::With();
+    assembly->externalSystem->freecadAssemblyObject = this;
     assembly->setName("OndselAssembly");
 
     ParameterGrp::handle hPgr = App::GetApplication().GetParameterGroupByPath(
@@ -527,8 +610,12 @@ ViewGroup* AssemblyObject::getExplodedViewGroup() const
     return nullptr;
 }
 
-std::vector<App::DocumentObject*>
-AssemblyObject::getJoints(bool updateJCS, bool delBadJoints, bool subJoints)
+SimulationGroup* Assembly::AssemblyObject::getSimulationGroup(const Base::Type& typeId)
+{
+    return nullptr;
+}
+
+std::vector<App::DocumentObject*> AssemblyObject::getJoints(bool updateJCS, bool delBadJoints)
 {
     std::vector<App::DocumentObject*> joints = {};
 
@@ -913,6 +1000,25 @@ void AssemblyObject::jointParts(std::vector<App::DocumentObject*> joints)
     }
 }
 
+void Assembly::AssemblyObject::create_mbdSimulationParameters()
+{
+    auto mbdSim = mbdAssembly->simulationParameters;
+    if (getGroup<SimulationGroup>() == nullptr || getGroup<SimulationGroup>()->getObjects().empty()) {
+        return;
+    }
+    auto simDoc = getGroup<SimulationGroup>()->getObjects().front();
+    auto valueOf = [](DocumentObject* docObj, const char* propName) {
+        auto* prop = dynamic_cast<App::PropertyFloat*>(docObj->getPropertyByName(propName));
+        return prop->getValue();
+    };
+    mbdSim->settstart(valueOf(simDoc, "aTimeStart"));
+    mbdSim->settend(valueOf(simDoc, "bTimeEnd"));
+    mbdSim->sethout(valueOf(simDoc, "cTimeStepOutput"));
+    mbdSim->sethmin(valueOf(simDoc, "dTimeStepMinimum"));
+    mbdSim->sethmax(valueOf(simDoc, "eTimeStepMaximum"));
+    mbdSim->seterrorTol(valueOf(simDoc, "fGlobalErrorTolerance"));
+}
+
 std::shared_ptr<ASMTJoint> AssemblyObject::makeMbdJointOfType(App::DocumentObject* joint,
                                                               JointType type)
 {
@@ -1293,13 +1399,45 @@ AssemblyObject::makeMbdJoint(App::DocumentObject* joint)
 
             if (maxEnabled) {
                 auto limit2 = ASMTRotationLimit::With();
-                limit2->setName(joint->getFullName() + "-LimiRotMax");
+                limit2->setName(joint->getFullName() + "-LimitRotMax");
                 limit2->setMarkerI(fullMarkerNameI);
                 limit2->setMarkerJ(fullMarkerNameJ);
                 limit2->settype("=<");
                 limit2->setlimit(std::to_string(maxAngle) + "*pi/180.0");
                 limit2->settol("1.0e-9");
                 mbdAssembly->addLimit(limit2);
+            }
+        }
+    }
+    else {
+        if (jointType == JointType::Slider || jointType == JointType::Cylindrical) {
+            auto* propLinearMotion =
+                dynamic_cast<App::PropertyString*>(joint->getPropertyByName("LinearMotionFormula"));
+            if (propLinearMotion) {
+                std::string formula = propLinearMotion->getValue();
+                if (formula != "") {
+                    auto motion = CREATE<ASMTTranslationalMotion>::With();
+                    motion->setName(joint->getFullName() + "-LinearMotion");
+                    motion->setMarkerI(fullMarkerNameI);
+                    motion->setMarkerJ(fullMarkerNameJ);
+                    motion->setTranslationZ(formula);
+                    mbdAssembly->addMotion(motion);
+                }
+            }
+        }
+        if (jointType == JointType::Revolute || jointType == JointType::Cylindrical) {
+            auto* propAngularMotion = 
+                dynamic_cast<App::PropertyString*>(joint->getPropertyByName("AngularMotionFormula"));
+            if (propAngularMotion) {
+                std::string formula = propAngularMotion->getValue();
+                if (formula != "") {
+                    auto motion = CREATE<ASMTRotationalMotion>::With();
+                    motion->setName(joint->getFullName() + "-AngularMotion");
+                    motion->setMarkerI(fullMarkerNameI);
+                    motion->setMarkerJ(fullMarkerNameJ);
+                    motion->setRotationZ(formula);
+                    mbdAssembly->addMotion(motion);
+                }
             }
         }
     }

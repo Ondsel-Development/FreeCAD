@@ -79,6 +79,7 @@ class CommandCreateAssembly:
         if not activeAssembly:
             Gui.ActiveDocument.setEdit(assembly)
         assembly.newObject("Assembly::JointGroup", "Joints")
+        assembly.newObject("Assembly::SimulationGroup", "Simulations")
         App.closeActiveTransaction()
 
 

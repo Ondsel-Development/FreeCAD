@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TaskAssemblyCreateSimulation</class>
+ <widget class="QDialog" name="TaskAssemblyCreateSimulation">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>602</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Create Simulation</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_2">
+   <item>
+    <widget class="QLabel" name="SimulationDialogLabel">
+     <property name="text">
+      <string>Simulation Dialog</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QGridLayout" name="gridLayout">
+     <item row="0" column="0">
+      <widget class="QLabel" name="TimeStartLabel">
+       <property name="text">
+        <string>Time Start</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QDoubleSpinBox" name="TimeStartSpinBox">
+       <property name="suffix">
+        <string>s</string>
+       </property>
+       <property name="decimals">
+        <number>9</number>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="TimeEndLabel">
+       <property name="text">
+        <string>Time End</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QDoubleSpinBox" name="TimeEndSpinBox">
+       <property name="suffix">
+        <string>s</string>
+       </property>
+       <property name="decimals">
+        <number>9</number>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="TimeStepOutputLabel">
+       <property name="text">
+        <string>Time Step Output</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QDoubleSpinBox" name="TimeStepOutputSpinBox">
+       <property name="suffix">
+        <string>s</string>
+       </property>
+       <property name="decimals">
+        <number>9</number>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="0">
+      <widget class="QLabel" name="TimeStepMinimumLabel">
+       <property name="text">
+        <string>Time Step Minimum</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="1">
+      <widget class="QDoubleSpinBox" name="TimeStepMinimumSpinBox">
+       <property name="suffix">
+        <string>s</string>
+       </property>
+       <property name="decimals">
+        <number>9</number>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="0">
+      <widget class="QLabel" name="TimeStepMaximumLabel">
+       <property name="text">
+        <string>Time Step Maximum</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="1">
+      <widget class="QDoubleSpinBox" name="TimeStepMaximumSpinBox">
+       <property name="suffix">
+        <string>s</string>
+       </property>
+       <property name="decimals">
+        <number>9</number>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="0">
+      <widget class="QLabel" name="GlobalErrorToleranceLabel">
+       <property name="text">
+        <string>Global Error Tolerance</string>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="1">
+      <widget class="QDoubleSpinBox" name="GlobalErrorToleranceSpinBox">
+       <property name="decimals">
+        <number>9</number>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <widget class="QLabel" name="InitialConditionsLabel">
+       <property name="text">
+        <string>Initial Conditions</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QRadioButton" name="InputStateRadioButton">
+       <property name="text">
+        <string>Input State</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QRadioButton" name="InitialAssembledStateRadioButton">
+       <property name="text">
+        <string>Initial Assembled State</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QRadioButton" name="CurrentStateRadioButton">
+       <property name="text">
+        <string>Current State</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="RunKinematicsButton">
+       <property name="text">
+        <string>Run Kinematics</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QLabel" name="AnimationDialogLabel">
+     <property name="text">
+      <string>Animation Dialog</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QGridLayout" name="gridLayout_2">
+     <item row="0" column="1">
+      <widget class="QLabel" name="FrameLabel">
+       <property name="text">
+        <string>Frame</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QSpinBox" name="CurrentFrameSpinBox">
+       <property name="maximum">
+        <number>1000000</number>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="2">
+      <widget class="QLabel" name="CurrentTimeLabel">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="2">
+      <widget class="QLabel" name="EndTimeLabel">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="StartFrameLabel">
+       <property name="text">
+        <string>Start</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="2">
+      <widget class="QLabel" name="TimeLabel">
+       <property name="text">
+        <string>Time</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="0">
+      <widget class="QLabel" name="blankLabel">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="1">
+      <widget class="QSpinBox" name="EndFrameSpinBox">
+       <property name="maximum">
+        <number>1000000</number>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="2">
+      <widget class="QLabel" name="StartTimeLabel">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="0">
+      <widget class="QLabel" name="EndFrameLabel">
+       <property name="text">
+        <string>End</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QSpinBox" name="StartFrameSpinBox">
+       <property name="maximum">
+        <number>1000000</number>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="CurrentFrameLabel">
+       <property name="text">
+        <string>Current</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QGridLayout" name="gridLayout_3">
+     <item row="0" column="0">
+      <widget class="QLabel" name="FramesPerSecondLabel">
+       <property name="text">
+        <string>Frames Per Second</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QSpinBox" name="FramesPerSecondSpinBox"/>
+     </item>
+     <item row="1" column="0">
+      <widget class="QPushButton" name="PlayBackwardButton">
+       <property name="text">
+        <string>Play Backward</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QPushButton" name="PlayForwardButton">
+       <property name="text">
+        <string>Play Forward</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0">
+      <widget class="QPushButton" name="StepBackwardButton">
+       <property name="text">
+        <string>Step Backward</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QPushButton" name="StepForwardButton">
+       <property name="text">
+        <string>Step Forward</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

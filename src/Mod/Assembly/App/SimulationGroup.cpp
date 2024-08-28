@@ -22,50 +22,34 @@
  ***************************************************************************/
 
 #include "PreCompiled.h"
+#ifndef _PreComp_
+#endif
 
+#include <App/Application.h>
+#include <App/Document.h>
+#include <App/FeaturePythonPyImp.h>
+#include <App/PropertyPythonObject.h>
 #include <Base/Console.h>
-#include <Base/Interpreter.h>
-#include <Base/PyObjectBase.h>
+#include <Base/Tools.h>
 
-#include "ViewProviderAssembly.h"
-#include "ViewProviderBom.h"
-#include "ViewProviderBomGroup.h"
-#include "ViewProviderJointGroup.h"
-#include "ViewProviderViewGroup.h"
-#include "ViewProviderSimulationGroup.h"
+#include "SimulationGroup.h"
+#include "SimulationGroupPy.h"
+
+using namespace Assembly;
 
 
-namespace AssemblyGui
+PROPERTY_SOURCE(Assembly::SimulationGroup, App::DocumentObjectGroup)
+
+SimulationGroup::SimulationGroup()
+{}
+
+SimulationGroup::~SimulationGroup() = default;
+
+PyObject* SimulationGroup::getPyObject()
 {
-extern PyObject* initModule();
-}
-
-/* Python entry */
-PyMOD_INIT_FUNC(AssemblyGui)
-{
-    // load dependent module
-    try {
-        Base::Interpreter().runString("import SpreadsheetGui");
+    if (PythonObject.is(Py::_None())) {
+        // ref counter is set to 1
+        PythonObject = Py::Object(new SimulationGroupPy(this), true);
     }
-    catch (const Base::Exception& e) {
-        PyErr_SetString(PyExc_ImportError, e.what());
-        PyMOD_Return(nullptr);
-    }
-
-    PyObject* mod = AssemblyGui::initModule();
-    Base::Console().Log("Loading AssemblyGui module... done\n");
-
-
-    // NOTE: To finish the initialization of our own type objects we must
-    // call PyType_Ready, otherwise we run into a segmentation fault, later on.
-    // This function is responsible for adding inherited slots from a type's base class.
-
-    AssemblyGui::ViewProviderAssembly::init();
-    AssemblyGui::ViewProviderBom::init();
-    AssemblyGui::ViewProviderBomGroup::init();
-    AssemblyGui::ViewProviderJointGroup::init();
-    AssemblyGui::ViewProviderViewGroup::init();
-    AssemblyGui::ViewProviderSimulationGroup::init();
-
-    PyMOD_Return(mod);
+    return Py::new_reference_to(PythonObject);
 }
