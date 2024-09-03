@@ -1409,35 +1409,33 @@ AssemblyObject::makeMbdJoint(App::DocumentObject* joint)
             }
         }
     }
-    else {
-        if (jointType == JointType::Slider || jointType == JointType::Cylindrical) {
-            auto* propLinearMotion =
-                dynamic_cast<App::PropertyString*>(joint->getPropertyByName("LinearMotionFormula"));
-            if (propLinearMotion) {
-                std::string formula = propLinearMotion->getValue();
-                if (formula != "") {
-                    auto motion = CREATE<ASMTTranslationalMotion>::With();
-                    motion->setName(joint->getFullName() + "-LinearMotion");
-                    motion->setMarkerI(fullMarkerNameI);
-                    motion->setMarkerJ(fullMarkerNameJ);
-                    motion->setTranslationZ(formula);
-                    mbdAssembly->addMotion(motion);
-                }
+    if (jointType == JointType::Slider || jointType == JointType::Cylindrical) {
+        auto* propLinearMotion =
+            dynamic_cast<App::PropertyString*>(joint->getPropertyByName("LinearMotionFormula"));
+        if (propLinearMotion) {
+            std::string formula = propLinearMotion->getValue();
+            if (formula != "") {
+                auto motion = CREATE<ASMTTranslationalMotion>::With();
+                motion->setName(joint->getFullName() + "-LinearMotion");
+                motion->setMarkerI(fullMarkerNameI);
+                motion->setMarkerJ(fullMarkerNameJ);
+                motion->setTranslationZ(formula);
+                mbdAssembly->addMotion(motion);
             }
         }
-        if (jointType == JointType::Revolute || jointType == JointType::Cylindrical) {
-            auto* propAngularMotion = 
-                dynamic_cast<App::PropertyString*>(joint->getPropertyByName("AngularMotionFormula"));
-            if (propAngularMotion) {
-                std::string formula = propAngularMotion->getValue();
-                if (formula != "") {
-                    auto motion = CREATE<ASMTRotationalMotion>::With();
-                    motion->setName(joint->getFullName() + "-AngularMotion");
-                    motion->setMarkerI(fullMarkerNameI);
-                    motion->setMarkerJ(fullMarkerNameJ);
-                    motion->setRotationZ(formula);
-                    mbdAssembly->addMotion(motion);
-                }
+    }
+    if (jointType == JointType::Revolute || jointType == JointType::Cylindrical) {
+        auto* propAngularMotion = 
+            dynamic_cast<App::PropertyString*>(joint->getPropertyByName("AngularMotionFormula"));
+        if (propAngularMotion) {
+            std::string formula = propAngularMotion->getValue();
+            if (formula != "") {
+                auto motion = CREATE<ASMTRotationalMotion>::With();
+                motion->setName(joint->getFullName() + "-AngularMotion");
+                motion->setMarkerI(fullMarkerNameI);
+                motion->setMarkerJ(fullMarkerNameJ);
+                motion->setRotationZ(formula);
+                mbdAssembly->addMotion(motion);
             }
         }
     }
