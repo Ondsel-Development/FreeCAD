@@ -256,6 +256,9 @@ def getGlobalPlacement(ref, targetObj=None):
     if not isRefValid(ref, 1):
         return App.Placement()
 
+    # Resolve markers
+    ref = resolveRef(ref)
+
     if targetObj is None:  # If no targetObj is given, we consider it's the getObject(ref)
         targetObj = getObject(ref)
 
@@ -804,6 +807,46 @@ def setJointsPickableState(doc, state: bool):
             setPickableState(obj, state)
 
 
+def setMarkersPickableState(doc, state: bool):
+    """Make all markers in document selectable (True) or unselectable (False) in 3D view"""
+    for obj in doc.Objects:
+        if obj.TypeId == "App::FeaturePython" and hasattr(obj, "Detach"):
+            setPickableState(obj, state)
+
+
+def setMarkersAndJointsPickableState(doc, state: bool):
+    """Make all joints and markers in document selectable (True) or unselectable (False) in 3D view"""
+    for obj in doc.Objects:
+        if obj.TypeId == "App::FeaturePython" and (
+            hasattr(obj, "JointType") or hasattr(obj, "Detach")
+        ):
+            setPickableState(obj, state)
+
+
+def isRefMarker(ref):
+    obj = getObject(ref)
+    return isMarker(obj)
+
+
+def isMarker(obj):
+    if obj is None:
+        return False
+
+    if obj.TypeId == "App::FeaturePython" and hasattr(obj, "Detach"):
+        if hasattr(obj, "Proxy"):
+            proxy = obj.Proxy
+            if hasattr(proxy, "setMarkerReference"):
+                return True
+    return False
+
+
+def resolveRef(ref):
+    obj = getObject(ref)
+    if isMarker(obj):
+        return obj.Reference
+    return ref
+
+
 def applyOffsetToPlacement(plc, offset):
     plc.Base = plc.Base + plc.Rotation.multVec(offset)
     return plc
@@ -1097,6 +1140,9 @@ def getMovingPart(assembly, ref):
     # [assembly, ['box.edge1', 'box.vertex2']]
     # [Part, ['Assembly.box.edge1', 'Assembly.box.vertex2']]
     # [assembly, ['Body.Pad.edge1', 'Body.Pad.vertex2']]
+
+    # Resolve markers
+    ref = resolveRef(ref)
 
     if assembly is None or ref is None or len(ref) != 2:
         return None

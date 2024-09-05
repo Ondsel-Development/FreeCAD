@@ -566,6 +566,13 @@ bool ViewProviderAssembly::canDragObjectIn3d(App::DocumentObject* obj) const
         return false;
     }
 
+    // We have to exclude Markers as they happen to have a Placement prop
+    auto* propBool = dynamic_cast<App::PropertyBool*>(obj->getPropertyByName("Detach"));
+    auto* propPlc = dynamic_cast<App::PropertyPlacement*>(obj->getPropertyByName("Offset"));
+    if (propBool && propPlc) {
+        return false;
+    }
+
     // We have to exclude Grounded joints as they happen to have a Placement prop
     auto* propLink = dynamic_cast<App::PropertyLink*>(obj->getPropertyByName("ObjectToGround"));
     if (propLink) {
@@ -769,8 +776,7 @@ ViewProviderAssembly::DragMode ViewProviderAssembly::findDragMode()
         jcsPlc = App::GeoFeature::getPlacementFromProp(movingJoint, plcPropName);
 
         // Make jcsGlobalPlc relative to the origin of the doc
-        auto* ref =
-            dynamic_cast<App::PropertyXLinkSub*>(movingJoint->getPropertyByName(pName.c_str()));
+        auto* ref = Assembly::AssemblyObject::getResolvedRef(movingJoint, pName.c_str());
         if (!ref) {
             return DragMode::Translation;
         }

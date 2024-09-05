@@ -634,8 +634,13 @@ class Joint:
     """
 
     def findPlacement(self, joint, ref, index=0):
-        ignoreVertex = joint.JointType == "Distance"
-        plc = UtilsAssembly.findPlacement(ref, ignoreVertex)
+        # If the ref is a marker, then we take it's placement as it's already computed
+        obj = UtilsAssembly.getObject(ref)
+        if UtilsAssembly.isMarker(obj):
+            plc = obj.Placement
+        else:
+            ignoreVertex = joint.JointType == "Distance"
+            plc = UtilsAssembly.findPlacement(ref, ignoreVertex)
 
         # We apply the attachment offsets.
         if index == 0:
@@ -1152,6 +1157,10 @@ class MakeJointSelGate:
 
         ref = [obj, [sub]]
         selected_object = UtilsAssembly.getObject(ref)
+
+        # Markers are ok to select.
+        if UtilsAssembly.isMarker(selected_object):
+            return True
 
         if not (
             selected_object.isDerivedFrom("Part::Feature")

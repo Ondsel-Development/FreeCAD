@@ -11,10 +11,12 @@ set(Assembly_Scripts
     CommandInsertLink.py
     CommandSolveAssembly.py
     CommandCreateJoint.py
+    CommandCreateMarker.py
     CommandCreateView.py
     CommandExportASMT.py
     TestAssemblyWorkbench.py
     JointObject.py
+    MarkerObject.py
     Preferences.py
     AssemblyImport.py
     SoSwitchMarker.py

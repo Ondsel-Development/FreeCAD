@@ -389,9 +389,22 @@ void AssemblyObject::redrawJointPlacements(std::vector<App::DocumentObject*> joi
     }
 }
 
+void AssemblyObject::redrawMarkerPlacements(std::vector<App::DocumentObject*> markers)
+{
+    // Notify the joint objects that the transform of the coin object changed.
+    for (auto* marker : markers) {
+        auto* pPlc = dynamic_cast<App::PropertyPlacement*>(marker->getPropertyByName("Placement"));
+        if (pPlc) {
+            pPlc->setValue(pPlc->getValue());
+        }
+        marker->purgeTouched();
+    }
+}
+
 void AssemblyObject::recomputeJointPlacements(std::vector<App::DocumentObject*> joints)
 {
-    // The Placement1 and Placement2 of each joint needs to be updated as the parts moved.
+    // The Placement1 and Placement2 of each joint needs to be updated in case the shape changed.
+    // This function can also update Markers Placements since they also have updateJCSPlacements
     for (auto* joint : joints) {
         App::PropertyPythonObject* proxy = joint
             ? dynamic_cast<App::PropertyPythonObject*>(joint->getPropertyByName("Proxy"))
@@ -549,6 +562,24 @@ AssemblyObject::getJoints(bool updateJCS, bool delBadJoints, bool subJoints)
     }
 
     return joints;
+}
+
+std::vector<App::DocumentObject*> AssemblyObject::getMarkers(bool updateJCS)
+{
+    std::vector<App::DocumentObject*> markers = {};
+
+    for (auto obj : getOutListRecursive()) {
+        if (isMarker(obj)) {
+            markers.push_back(obj);
+        }
+    }
+
+    // Make sure the markers are up to date.
+    if (updateJCS) {
+        recomputeJointPlacements(markers);
+    }
+
+    return markers;
 }
 
 std::vector<App::DocumentObject*> AssemblyObject::getGroundedJoints()
@@ -1297,7 +1328,7 @@ std::string AssemblyObject::handleOneSideOfJoint(App::DocumentObject* joint,
         // Make plc relative to the containing part
         // plc = objPlc * plc; // this would not work for nested parts.
 
-        auto* ref = dynamic_cast<App::PropertyXLinkSub*>(joint->getPropertyByName(propRefName));
+        auto* ref = getResolvedRef(joint, propRefName);
         if (!ref) {
             return "";
         }
@@ -1352,8 +1383,8 @@ void AssemblyObject::getRackPinionMarkers(App::DocumentObject* joint,
 
     // For the rack we need to change the placement :
     // make the pinion plc relative to the rack placement.
-    auto* ref1 = dynamic_cast<App::PropertyXLinkSub*>(joint->getPropertyByName("Reference1"));
-    auto* ref2 = dynamic_cast<App::PropertyXLinkSub*>(joint->getPropertyByName("Reference2"));
+    auto* ref1 = getResolvedRef(joint, "Reference1");
+    auto* ref2 = getResolvedRef(joint, "Reference2");
     if (!ref1 || !ref2) {
         return;
     }
@@ -2055,6 +2086,42 @@ bool AssemblyObject::getJointActivated(App::DocumentObject* joint)
     return false;
 }
 
+bool AssemblyObject::isMarker(App::DocumentObject* obj)
+{
+    if (!obj) {
+        return false;
+    }
+
+    Base::PyGILStateLocker lock;
+    auto proxy = dynamic_cast<App::PropertyPythonObject*>(obj->getPropertyByName("Proxy"));
+    if (proxy) {
+        if (proxy->getValue().hasAttr("setMarkerReference")) {
+            return true;
+        }
+    }
+    return false;
+}
+
+App::PropertyXLinkSub* AssemblyObject::resolveRef(App::PropertyXLinkSub* ref)
+{
+    if (!ref) {
+        return nullptr;
+    }
+    App::DocumentObject* obj = getObjFromRef(ref);
+
+    if (isMarker(obj)) {
+        auto* prop = dynamic_cast<App::PropertyXLinkSub*>(obj->getPropertyByName("Reference"));
+        return resolveRef(prop);
+    }
+    return ref;
+}
+
+App::PropertyXLinkSub* AssemblyObject::getResolvedRef(App::DocumentObject* obj,
+    const char* propName)
+{
+    return resolveRef(dynamic_cast<App::PropertyXLinkSub*>(obj->getPropertyByName(propName)));
+}
+
 double AssemblyObject::getJointDistance(App::DocumentObject* joint)
 {
     double distance = 0.0;
@@ -2301,6 +2368,9 @@ App::DocumentObject* AssemblyObject::getMovingPartFromRef(App::PropertyXLinkSub*
     if (!prop) {
         return nullptr;
     }
+
+    // Resolve markers
+    prop = resolveRef(prop);
 
     App::DocumentObject* obj = prop->getValue();
     if (!obj) {

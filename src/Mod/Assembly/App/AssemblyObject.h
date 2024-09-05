@@ -170,6 +170,7 @@ public:
     void setNewPlacements();
     static void recomputeJointPlacements(std::vector<App::DocumentObject*> joints);
     static void redrawJointPlacements(std::vector<App::DocumentObject*> joints);
+    static void redrawMarkerPlacements(std::vector<App::DocumentObject*> markers);
 
     // This makes sure that LinkGroups or sub-assemblies have identity placements.
     void ensureIdentityPlacements();
@@ -197,6 +198,7 @@ public:
     ViewGroup* getExplodedViewGroup() const;
     std::vector<App::DocumentObject*>
     getJoints(bool updateJCS = true, bool delBadJoints = false, bool subJoints = true);
+    std::vector<App::DocumentObject*> getMarkers(bool updateJCS = true);
     std::vector<App::DocumentObject*> getGroundedJoints();
     std::vector<App::DocumentObject*> getJointsOfObj(App::DocumentObject* obj);
     std::vector<App::DocumentObject*> getJointsOfPart(App::DocumentObject* part);
@@ -260,6 +262,10 @@ public:
     static DistanceType getDistanceType(App::DocumentObject* joint);
 
     static JointGroup* getJointGroup(const App::Part* part);
+
+    static bool isMarker(App::DocumentObject* obj);
+    static App::PropertyXLinkSub* resolveRef(App::PropertyXLinkSub* ref);
+    static App::PropertyXLinkSub* getResolvedRef(App::DocumentObject* obj, const char* propName);
 
     // getters to get from properties
     static void setJointActivated(App::DocumentObject* joint, bool val);

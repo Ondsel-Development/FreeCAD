@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TaskAssemblyCreateJoint</class>
+ <widget class="QWidget" name="TaskAssemblyCreateJoint">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>150</width>
+    <height>150</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Create Marker</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <layout class="QHBoxLayout" name="hLayoutOffset">
+     <item>
+      <widget class="QLabel" name="attachedLabel">
+       <property name="text">
+        <string>Not Attached</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="refLabel">
+       <property name="text">
+        <string></string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="1" column="0">
+    <layout class="QHBoxLayout" name="hLayoutOffset">
+     <item>
+      <widget class="QLabel" name="offsetLabel">
+       <property name="text">
+        <string>Attachment offset</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="offsetButton">
+       <property name="toolTip">
+        <string>By clicking this button, you can set the attachement offset of the marker.</string>
+       </property>
+       <property name="text">
+        <string></string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
