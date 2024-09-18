@@ -48,6 +48,7 @@
 #include <Base/Interpreter.h>
 #include <Base/Tools.h>
 #include <Gui/Application.h>
+#include <Gui/BitmapFactory.h>
 #include <Gui/Command.h>
 #include <gsl/pointers>
 
@@ -111,6 +112,7 @@ StartView::StartView(QWidget* parent)
     , _showOnStartupCheckBox {nullptr}
 {
     setObjectName(QLatin1String("StartView"));
+    setWindowIcon(Gui::BitmapFactory().pixmap("StartCommandIcon"));
     auto hGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Start");
     auto cardSpacing = hGrp->GetInt("FileCardSpacing", 15);  // NOLINT
