@@ -38,36 +38,12 @@ import UtilsAssembly
 import Preferences
 
 
-def get_camera_height(gui_doc):
-    activeView = get_active_view(gui_doc)
-    if activeView is None:
-        return 200
-
-    camera = activeView.getCameraNode()
-
-    # Check if the camera is a perspective camera
-    if isinstance(camera, coin.SoPerspectiveCamera):
-        return camera.focalDistance.getValue()
-    elif isinstance(camera, coin.SoOrthographicCamera):
-        return camera.height.getValue()
-    else:
-        # Default value if camera type is unknown
-        return 200
-
-
-def get_active_view(gui_doc):
-    activeView = gui_doc.ActiveView
-    if activeView is None:
-        # Fall back on current active document.
-        activeView = Gui.ActiveDocument.ActiveView
-    return activeView
-
-
 class SoSwitchMarker(coin.SoSwitch):
     def __init__(self, vobj):
         super().__init__()  # Initialize the SoSwitch base class
 
         self.axis_thickness = 3
+        self.scaleFactor = 20
 
         view_params = App.ParamGet("User parameter:BaseApp/Preferences/View")
         param_x_axis_color = view_params.GetUnsigned("AxisXColor", 0xCC333300)
@@ -84,20 +60,8 @@ class SoSwitchMarker(coin.SoSwitch):
         self.app_obj = vobj.Object
         app_doc = self.app_obj.Document
         self.gui_doc = Gui.getDocument(app_doc)
-        activeView = get_active_view(self.gui_doc)
-        if activeView is not None:
-            camera = activeView.getCameraNode()
-            self.cameraSensor = coin.SoFieldSensor(self.camera_callback, camera)
-            if isinstance(camera, coin.SoPerspectiveCamera):
-                self.cameraSensor.attach(camera.focalDistance)
-            elif isinstance(camera, coin.SoOrthographicCamera):
-                self.cameraSensor.attach(camera.height)
 
         self.transform = coin.SoTransform()
-
-        scaleF = self.get_JCS_size()
-        self.axisScale = coin.SoScale()
-        self.axisScale.scaleFactor.setValue(scaleF, scaleF, scaleF)
 
         self.draw_style = coin.SoDrawStyle()
         self.draw_style.style = coin.SoDrawStyle.LINES
@@ -131,12 +95,16 @@ class SoSwitchMarker(coin.SoSwitch):
         coords.point.setValues(0, [startPoint, endPoint])
 
         axis_sep = coin.SoAnnotation()
-        axis_sep.addChild(self.axisScale)
         axis_sep.addChild(self.draw_style)
         axis_sep.addChild(soColor)
         axis_sep.addChild(coords)
         axis_sep.addChild(line)
-        return axis_sep
+
+        scale = coin.SoType.fromName("SoShapeScale").createInstance()
+        scale.setPart("shape", axis_sep)
+        scale.scaleFactor = self.scaleFactor
+
+        return scale
 
     def plane_sep(self, size, num_vertices):
         coords = coin.SoCoordinate3()
@@ -164,20 +132,17 @@ class SoSwitchMarker(coin.SoSwitch):
         material.transparency.setValue(0.3)
 
         face_sep = coin.SoAnnotation()
-        face_sep.addChild(self.axisScale)
         face_sep.addChild(transform)
         face_sep.addChild(draw_style)
         face_sep.addChild(material)
         face_sep.addChild(coords)
         face_sep.addChild(face)
-        return face_sep
 
-    def camera_callback(self, *args):
-        scaleF = self.get_JCS_size()
-        self.axisScale.scaleFactor.setValue(scaleF, scaleF, scaleF)
+        scale = coin.SoType.fromName("SoShapeScale").createInstance()
+        scale.setPart("shape", face_sep)
+        scale.scaleFactor = self.scaleFactor
 
-    def get_JCS_size(self):
-        return get_camera_height(self.gui_doc) / 20
+        return scale
 
     def set_marker_placement(self, placement, ref):
         # change plc to be relative to the origin of the document.

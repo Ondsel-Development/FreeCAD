@@ -166,31 +166,6 @@ def solveIfAllowed(assembly, storePrev=False):
         assembly.solve(storePrev)
 
 
-def get_camera_height(gui_doc):
-    activeView = get_active_view(gui_doc)
-    if activeView is None:
-        return 200
-
-    camera = activeView.getCameraNode()
-
-    # Check if the camera is a perspective camera
-    if isinstance(camera, coin.SoPerspectiveCamera):
-        return camera.focalDistance.getValue()
-    elif isinstance(camera, coin.SoOrthographicCamera):
-        return camera.height.getValue()
-    else:
-        # Default value if camera type is unknown
-        return 200
-
-
-def get_active_view(gui_doc):
-    activeView = gui_doc.ActiveView
-    if activeView is None:
-        # Fall back on current active document.
-        activeView = Gui.ActiveDocument.ActiveView
-    return activeView
-
-
 # The joint object consists of 2 JCS (joint coordinate systems) and a Joint Type.
 # A JCS is a placement that is computed (unless it is detached) from references (PropertyXLinkSubHidden) that links to :
 # - An object: this can be any Part::Feature solid. Or a PartDesign Body. Or a App::Link to those.
@@ -1020,6 +995,8 @@ class ViewProviderGroundedJoint:
         if groundedObj is None:
             return
 
+        self.scaleFactor = 1.5
+
         lockpadColorInt = Preferences.preferences().GetUnsigned("AssemblyConstraints", 0xCC333300)
         self.lockpadColor = coin.SoBaseColor()
         self.lockpadColor.rgb.setValue(UtilsAssembly.color_from_unsigned(lockpadColorInt))
@@ -1028,100 +1005,92 @@ class ViewProviderGroundedJoint:
         app_doc = self.app_obj.Document
         self.gui_doc = Gui.getDocument(app_doc)
 
-        activeView = get_active_view(self.gui_doc)
-        if activeView is not None:
-            camera = activeView.getCameraNode()
-
-            self.cameraSensor = coin.SoFieldSensor(self.camera_callback, camera)
-            if isinstance(camera, coin.SoPerspectiveCamera):
-                self.cameraSensor.attach(camera.focalDistance)
-            elif isinstance(camera, coin.SoOrthographicCamera):
-                self.cameraSensor.attach(camera.height)
-
-            self.cameraSensorRot = coin.SoFieldSensor(self.camera_callback_rotation, camera)
-            self.cameraSensorRot.attach(camera.orientation)
-
-        factor = self.get_lock_factor()
-        self.scale = coin.SoScale()
-        self.scale.scaleFactor.setValue(factor, factor, factor)
-
-        self.draw_style = coin.SoDrawStyle()
-        self.draw_style.lineWidth = 5
-
         # Create transformation (position and orientation)
         self.transform = coin.SoTransform()
         self.set_lock_position(groundedObj)
-        self.set_lock_rotation()
 
         # Create the 2D components of the lockpad: a square and two arcs
-        # Creating a square
-        squareCoords = [
-            (-5, -4, 0),
-            (5, -4, 0),
-            (5, 4, 0),
-            (-5, 4, 0),
-        ]  # Simple square, adjust size as needed
-        self.square = coin.SoAnnotation()
-        squareVertices = coin.SoCoordinate3()
-        squareVertices.point.setValues(0, 4, squareCoords)
-        squareFace = coin.SoFaceSet()
-        squareFace.numVertices.setValue(4)
-        self.square.addChild(squareVertices)
-        self.square.addChild(squareFace)
+        self.square = self.create_square()
 
         # Creating the arcs (approximated with line segments)
-        self.arc = self.create_arc(0, 4, 3.5, 0, 180)
+        self.arc = self.create_arc(0, 4, 4, 0, 180)
 
         self.pick = coin.SoPickStyle()
         self.pick.style.setValue(coin.SoPickStyle.SHAPE_ON_TOP)
 
         # Assemble the parts into a scenegraph
-        self.lockpadSeparator = coin.SoAnnotation()
-        self.lockpadSeparator.addChild(self.pick)
-        self.lockpadSeparator.addChild(self.transform)
-        self.lockpadSeparator.addChild(self.scale)
+        self.lockpadSeparator = coin.SoSeparator()
         self.lockpadSeparator.addChild(self.lockpadColor)
         self.lockpadSeparator.addChild(self.square)
         self.lockpadSeparator.addChild(self.arc)
 
+        # Use SoVRMLBillboard to make sure the lockpad always faces the camera
+        self.billboard = coin.SoVRMLBillboard()
+        self.billboard.addChild(self.lockpadSeparator)
+
+        self.scale = coin.SoType.fromName("SoShapeScale").createInstance()
+        self.scale.setPart("shape", self.billboard)
+        self.scale.scaleFactor = self.scaleFactor
+
+        self.transformSeparator = coin.SoSeparator()
+        self.transformSeparator.addChild(self.transform)
+        self.transformSeparator.addChild(self.pick)
+        self.transformSeparator.addChild(self.scale)
+
         # Attach the scenegraph to the view provider
-        vobj.addDisplayMode(self.lockpadSeparator, "Wireframe")
+        vobj.addDisplayMode(self.transformSeparator, "Wireframe")
+
+    def create_square(self):
+        coords = [
+            (-5, -4, 0),
+            (5, -4, 0),
+            (5, 4, 0),
+            (-5, 4, 0),
+        ]
+        vertices = coin.SoCoordinate3()
+        vertices.point.setValues(0, 4, coords)
+
+        squareFace = coin.SoFaceSet()
+        squareFace.numVertices.setValue(4)
+
+        square = coin.SoAnnotation()
+        square.addChild(vertices)
+        square.addChild(squareFace)
+
+        return square
 
     def create_arc(self, centerX, centerY, radius, startAngle, endAngle):
-        arc = coin.SoAnnotation()
-        coords = coin.SoCoordinate3()
-        points = []
-        for angle in range(startAngle, endAngle + 1):  # Increment can be adjusted for smoother arcs
+        coords = []
+        for angle in range(
+            startAngle, endAngle + 1, 5
+        ):  # Increment can be adjusted for smoother arcs
             rad = math.radians(angle)
             x = centerX + math.cos(rad) * radius
             y = centerY + math.sin(rad) * radius
-            points.append((x, y, 0))
-        coords.point.setValues(0, len(points), points)
-        line = coin.SoLineSet()
-        line.numVertices.setValue(len(points))
-        arc.addChild(coords)
-        arc.addChild(self.draw_style)
+            coords.append((x, y, 0))
+
+        radius = radius * 0.7
+        for angle in range(endAngle + 1, startAngle - 1, -5):  # Step backward
+            rad = math.radians(angle)
+            x = centerX + math.cos(rad) * radius
+            y = centerY + math.sin(rad) * radius
+            coords.append((x, y, 0))
+
+        vertices = coin.SoCoordinate3()
+        vertices.point.setValues(0, len(coords), coords)
+
+        shapeHints = coin.SoShapeHints()
+        shapeHints.faceType = coin.SoShapeHints.UNKNOWN_FACE_TYPE
+
+        line = coin.SoFaceSet()
+        line.numVertices.setValue(len(coords))
+
+        arc = coin.SoAnnotation()
+        arc.addChild(shapeHints)
+        arc.addChild(vertices)
         arc.addChild(line)
+
         return arc
-
-    def camera_callback(self, *args):
-        factor = self.get_lock_factor()
-        self.scale.scaleFactor.setValue(factor, factor, factor)
-
-    def camera_callback_rotation(self, *args):
-        self.set_lock_rotation()
-
-    def set_lock_rotation(self):
-        activeView = get_active_view(self.gui_doc)
-        if activeView is not None:
-            camera = activeView.getCameraNode()
-            rotation = camera.orientation.getValue()
-
-            q = rotation.getValue()
-            self.transform.rotation.setValue(q[0], q[1], q[2], q[3])
-
-    def get_lock_factor(self):
-        return get_camera_height(self.gui_doc) / 300
 
     def set_lock_position(self, groundedObj):
         bBox = groundedObj.ViewObject.getBoundingBox()
