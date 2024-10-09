@@ -40,7 +40,6 @@ if App.GuiUp:
         QComboBox,
         QLineEdit,
         QGridLayout,
-        QDesktopWidget,
         QLabel,
         QDialogButtonBox,
     )
