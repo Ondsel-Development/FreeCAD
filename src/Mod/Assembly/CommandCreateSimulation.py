@@ -44,8 +44,8 @@ if App.GuiUp:
         QLabel,
         QDialogButtonBox,
     )
-    from PySide2.QtCore import Qt, QPoint
-    from PySide2.QtGui import QCursor, QIcon
+    from PySide.QtCore import Qt, QPoint
+    from PySide.QtGui import QCursor, QIcon, QGuiApplication
 
 import UtilsAssembly
 import Preferences
@@ -725,7 +725,8 @@ SLOPE defines the steepness of the transition between 0 and H1 and H2 to 0 about
         dialog_position = main_window.mapToGlobal(global_position)
 
         # Get the screen geometry to ensure the dialog doesn't go off-screen
-        screen_geometry = QDesktopWidget().availableGeometry(self.dialog)
+        screen = QGuiApplication.screenAt(self.dialog.pos())
+        screen_geometry = screen.availableGeometry()
 
         # Adjust the position to keep the dialog within screen bounds
         if dialog_position.x() + self.dialog.width() > screen_geometry.width():
