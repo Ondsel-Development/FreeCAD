@@ -1415,6 +1415,11 @@ void Application::viewActivated(MDIView* pcView)
     }
 }
 
+/// Gets called if a view gets closed
+void Application::viewClosed(MDIView* pcView)
+{
+    signalCloseView(pcView);
+}
 
 void Application::updateActive()
 {
